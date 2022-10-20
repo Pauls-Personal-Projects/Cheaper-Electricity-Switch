@@ -134,11 +134,11 @@ async def loetleSeadmed(rakendusliides, lülitaSisse):
 		# Lülita Radiaatorid välja
 		if "Radiaator" in seade.label:
 			if lülitaSisse and loeNädalapäevaGraafikut(graafikuteKaust,seade.label):
-				print("Lülitan sisse")
-				#await seade.switch_on()
+				#print("Lülitan sisse")
+				await seade.switch_on()
 			else:
-				print("Lülitan välja")
-				#await seade.switch_off()
+				#print("Lülitan välja")
+				await seade.switch_off()
 			
 			print("Nüüd on elekter "+eestiKeelesBoolean(seade.status.switch)+". ("+str(seade.status.switch)+")")
 
