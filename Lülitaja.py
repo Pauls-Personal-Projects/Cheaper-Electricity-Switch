@@ -22,14 +22,15 @@ Link: https://github.com/grantlemons/light-control
 ####################################################################################################
 #    TEEGID                                                                                        #
 ####################################################################################################
-import aiohttp										#SmartThings APIga Ühendumiseks
-import pysmartthings								#SmartThings APIga Ühendumiseks
-import asyncio										#SmartThings APIga Ühendumiseks
+import aiohttp										# SmartThings APIga Ühendumiseks
+import pysmartthings								# SmartThings APIga Ühendumiseks
+import asyncio										# SmartThings APIga Ühendumiseks
 import os.path										# Failide Salvestamiseks ja Lugemiseks
 import csv											# Failide Salvestamiseks ja Lugemiseks
 from datetime import datetime, timezone, timedelta	# API Kellaaja konverteerimiseks
 from dateutil import tz, parser						# API Kellaaja konverteerimiseks
 import dateutil										# API Kellaaja konverteerimiseks
+import time											# Sleepi jaoks mida lülitite kontrollil läheb vaja
 
 
 
@@ -41,8 +42,10 @@ import dateutil										# API Kellaaja konverteerimiseks
 ### PEIDA ENNE GIT'i LAADIMIST ###
 SmartThingsi_Ligipääsu_Token = ''
 ### PEIDA ENNE GIT'i LAADIMIST ###
-jooksevFail = "Elektri_Jooksev_Kasutus.csv"
-graafikuteKaust = "Graafikud"
+jooksevFail = "Elektri_Jooksev_Kasutus.csv" # IDE Kaust
+graafikuteKaust = "Graafikud" # IDE Kaust
+#jooksevFail = "/volume1/homes/Paul/Drive/Ajutine/Elektri_Jooksev_Kasutus.csv" # Pilve Kaust
+#graafikuteKaust = "/volume1/Failid/Elektri Kasutus Graafikud" # Pilve Kaust
 
 
 
@@ -51,14 +54,6 @@ graafikuteKaust = "Graafikud"
 ####################################################################################################
 #	TUGIFUNKTSIOONID																			   #
 ####################################################################################################
-def eestiKeelesString(olek):
-	if olek == "True":
-		return "sees"
-	else:
-		return "väljas"
-
-
-
 def eestiKeelesBoolean(olek):
 	if olek:
 		return "sees"
@@ -67,22 +62,35 @@ def eestiKeelesBoolean(olek):
 
 
 
-def loeHinnaGraafikut(failiNimi):
+def loeHinnaGraafikut(failiNimi,seadmeNimi):
 	if os.path.exists(failiNimi):
 		with open(failiNimi, mode='r', encoding='utf-8') as elektriHinnaFail:
 			csvFail = list(csv.reader(elektriHinnaFail))
 		praeguneAeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))
 		print("Elektrihinnad on saadaval kuni kella "+parser.parse(csvFail[-1][0]).strftime("%H:%M (%d.%m.%Y)"))
+		kuupäevaTulp=0
+		hinnaTulp=0
+		päis=[]
 		for näit in csvFail:
-			if not näit[0] == "Kuupäev":
-				if parser.parse(näit[0]).year == praeguneAeg.year and parser.parse(näit[0]).month == praeguneAeg.month and parser.parse(näit[0]).day == praeguneAeg.day and parser.parse(näit[0]).hour == praeguneAeg.hour:
-					print("Kell on "+praeguneAeg.strftime("%H:%M (%d.%m.%Y)"))
-					print("Elektrihind on "+näit[1]+"€/MWh")
-					print("Elekter peaks "+eestiKeelesString(näit[2])+" olema! ("+näit[2]+")")
-					if näit[2] == "True":
-						return True
-					else:
-						return False
+			if näit == csvFail[0]:
+				päis = näit
+				for tulp in range(len(päis)):
+					if päis[tulp] == "Kuupäev":
+						kuupäevaTulp=tulp
+					elif päis[tulp] == "Hind":
+						hinnaTulp=tulp
+			else:
+				if parser.parse(näit[kuupäevaTulp]).year == praeguneAeg.year and parser.parse(näit[kuupäevaTulp]).month == praeguneAeg.month and parser.parse(näit[kuupäevaTulp]).day == praeguneAeg.day and parser.parse(näit[kuupäevaTulp]).hour == praeguneAeg.hour:
+					for seade in range(len(päis)):
+						if päis[seade] == seadmeNimi:
+							print("Elektrihinna Graafik: "+parser.parse(näit[kuupäevaTulp]).strftime("%d.%m.%Y kella %H:%Mst on elektrihind ")+näit[hinnaTulp]+"€/MWh ja elekter peaks "+näit[seade]+" olema!")
+							if näit[seade] == "sees":
+								return True
+							elif näit[seade] == "väljas":
+								return False
+							else:
+								print("Ei Tuvastanud Olekut!")
+								return True
 	else:
 		print("Ei Leidnud Elektrihinna Graafikut! ("+failiNimi+")")
 		return True
@@ -120,7 +128,7 @@ async def loetleAsukohad(rakendusliides):
 
 
 
-async def loetleSeadmed(rakendusliides, lülitaSisse):
+async def loetleSeadmed(rakendusliides):
 	seadmed = await rakendusliides.devices()
 	print("* * * * * * * * * * * * * * * * * * * * * * * * * ")
 	print(str(len(seadmed))+" Seade(t)")
@@ -128,27 +136,22 @@ async def loetleSeadmed(rakendusliides, lülitaSisse):
 		print("- - - - - - - - - - - - - - - - - - - - - - - - - ")
 		await seade.status.refresh()
 		print("Nimi: "+seade.label)
-		print("Elekter: "+eestiKeelesBoolean(seade.status.switch)+" ("+str(seade.status.switch)+")")
+		print("Enne Elekter: "+eestiKeelesBoolean(seade.status.switch)+" ("+str(seade.status.switch)+")")
 		#print(f'Võimed: {seade.capabilities}')
-
-		# Lülita Radiaatorid välja
-		if "Radiaator" in seade.label:
-			if lülitaSisse and loeNädalapäevaGraafikut(graafikuteKaust,seade.label):
-				#print("Lülitan sisse")
-				await seade.switch_on()
-			else:
-				#print("Lülitan välja")
-				await seade.switch_off()
-			
-			print("Nüüd on elekter "+eestiKeelesBoolean(seade.status.switch)+". ("+str(seade.status.switch)+")")
+		if loeHinnaGraafikut(jooksevFail,seade.label) and loeNädalapäevaGraafikut(graafikuteKaust,seade.label):
+			await seade.switch_on()
+		else:
+			await seade.switch_off()
+		#time.sleep(3)
+		print("Nüüd Elekter "+eestiKeelesBoolean(seade.status.switch)+". ("+str(seade.status.switch)+")")
 
 
 
-async def ühendaSmartThingsi(seadmeteOlek):
+async def ühendaSmartThingsi():
 	async with aiohttp.ClientSession() as session:
 		api = pysmartthings.SmartThings(session, SmartThingsi_Ligipääsu_Token)
 		await loetleAsukohad(api)
-		await loetleSeadmed(api, seadmeteOlek)
+		await loetleSeadmed(api)
 
 
 
@@ -160,12 +163,8 @@ async def ühendaSmartThingsi(seadmeteOlek):
 if __name__ == "__main__":
 	print("\nTere Tulemast Lülitajasse\n")
 	print("--------------------------------------------------")
-	print("GRAAFIKU LUGEMINE")
-	print("--------------------------------------------------")
-	lülitiOlek = loeHinnaGraafikut(jooksevFail)
-	print("--------------------------------------------------")
 	print("LÜLITITELE VAJUTAMINE")
 	print("--------------------------------------------------")
 	loop = asyncio.get_event_loop()
-	loop.run_until_complete( ühendaSmartThingsi(lülitiOlek) )
+	loop.run_until_complete(ühendaSmartThingsi())
 	print("--------------------------------------------------")
