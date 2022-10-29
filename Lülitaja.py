@@ -46,6 +46,7 @@ jooksevFail = "Elektri_Jooksev_Kasutus.csv" # IDE Kaust
 graafikuteKaust = "Graafikud" # IDE Kaust
 #jooksevFail = "/volume1/homes/Paul/Drive/Ajutine/Elektri_Jooksev_Kasutus.csv" # Pilve Kaust
 #graafikuteKaust = "/volume1/Failid/Elektri Kasutus Graafikud" # Pilve Kaust
+silumine = False
 
 
 
@@ -67,7 +68,7 @@ def loeHinnaGraafikut(failiNimi,seadmeNimi):
 		with open(failiNimi, mode='r', encoding='utf-8') as elektriHinnaFail:
 			csvFail = list(csv.reader(elektriHinnaFail))
 		praeguneAeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))
-		print("Elektrihinnad on saadaval kuni kella "+parser.parse(csvFail[-1][0]).strftime("%H:%M (%d.%m.%Y)"))
+		#print("Elektrihinnad on saadaval kuni kella "+parser.parse(csvFail[-1][0]).strftime("%H:%M (%d.%m.%Y)"))
 		kuupäevaTulp=0
 		hinnaTulp=0
 		päis=[]
@@ -90,9 +91,11 @@ def loeHinnaGraafikut(failiNimi,seadmeNimi):
 								return False
 							else:
 								print("Ei Tuvastanud Olekut!")
+								silumine = True
 								return True
 	else:
 		print("Ei Leidnud Elektrihinna Graafikut! ("+failiNimi+")")
+		silumine = True
 		return True
 
 
@@ -112,12 +115,15 @@ def loeNädalapäevaGraafikut(kaust,seadmeNimi):
 				return False
 			else:
 				print("Nädalapäeva Graafik: Ei suutnud tuvastada mis ("+csvFail[praeguneAeg.hour+1][praeguneAeg.weekday()+1].strip()+") tähendab "+csvFail[0][praeguneAeg.weekday()+1].strip()+" kell "+csvFail[praeguneAeg.hour+1][0].strip())
+				silumine = True
 				return True
 		else:
 			print("Leidsin "+graafikuAsukoht+" faili, kuid formaat tundub vale!")
+			silumine = True
 			return True
 	else:
 		print("Ei Leidnud Nädalapäeva Graafikut! ("+graafikuAsukoht+")")
+		silumine = True
 		return True
 
 
@@ -139,11 +145,13 @@ async def loetleSeadmed(rakendusliides):
 		print("Enne Elekter: "+eestiKeelesBoolean(seade.status.switch)+" ("+str(seade.status.switch)+")")
 		#print(f'Võimed: {seade.capabilities}')
 		if loeHinnaGraafikut(jooksevFail,seade.label) and loeNädalapäevaGraafikut(graafikuteKaust,seade.label):
+			print("Lülitan Sisse!")
 			await seade.switch_on()
 		else:
+			print("Lülitan Välja!")
 			await seade.switch_off()
 		#time.sleep(3)
-		print("Nüüd Elekter "+eestiKeelesBoolean(seade.status.switch)+". ("+str(seade.status.switch)+")")
+		#print("Nüüd Elekter "+eestiKeelesBoolean(seade.status.switch)+". ("+str(seade.status.switch)+")")
 
 
 
@@ -168,3 +176,7 @@ if __name__ == "__main__":
 	loop = asyncio.get_event_loop()
 	loop.run_until_complete(ühendaSmartThingsi())
 	print("--------------------------------------------------")
+	if silumine:
+		print("SILUR SEES")
+	else:
+		return 0

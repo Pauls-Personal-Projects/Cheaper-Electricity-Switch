@@ -46,6 +46,7 @@ lõppAeg = algAeg+timedelta(days=2)
 ajutisedSeadmed = ["Köök-Nõudepesumasin", "Paul-Kontor"]
 ajutisedRadiaatorid = ["Garderoob-Radiaator", "Paul-Radiaator", "Magamis-Radiaator"]
 ### AJUTINE ###
+silumine = False
 
 
 
@@ -84,6 +85,7 @@ def viimaneElektriHind(apiAadress):
 		print("Hind: "+str(hind)+"¢/kWh")
 	else:
 		print("Viga: "+requests.get(võrguAadress).status_code+" (Kontrolli Eleringi API't)")
+		silumine = True
 		
 		
 		
@@ -98,6 +100,7 @@ def elektriHindVahemikus(algKuupäev, lõppKuupäev, apiAadress):
 		return elektriHinnad
 	else:
 		print("Viga: "+requests.get(võrguAadress).status_code+" (Kontrolli Eleringi API't)")
+		silumine = True
 
 
 
@@ -145,31 +148,41 @@ def salvestaJooksevInfo(failiNimi, salvestamataAndmed):
 
 
 
-# VAJAB UUENDAMIST #
 def salvestaArhiiviInfo(kaustaNimi, salvestamataAndmed):
 	def looFail(failiNimi):
 		with open(failiNimi, mode='w', encoding='utf-8') as elektriHinnaFail:
 			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-		csvFail.writerow(["Kuupäev", "Hind", "Lülitid"])
+		päis = ['Kuupäev']
+		päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
+		csvFail.writerow(päis)
 		for aeg in range(len(salvestamataAndmed)):
-			if salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]]["sees"]:
-				lüliti = "sees"
-			else:
-				lüliti = "väljas"
-			csvFail.writerow([str(list(salvestamataAndmed.keys())[aeg]), (salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]]["Hind"]), lüliti])
+			rida = [str(list(salvestamataAndmed.keys())[aeg]), salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[1]], round(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[2]],2)]
+			for seade in range(3,len(päis)):
+				rida.append(booleanTekstiks(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[seade]]))
+			csvFail.writerow(rida)
 		print(len(salvestamataAndmed)+" näitu arhiveeritud faili: "+failiNimi)
 	def otsiJärg(failiNimi):
 		with open(failiNimi, mode ='r', encoding='utf-8')as elektriHinnaFail:
 			csvFail = list(csv.reader(elektriHinnaFail))
 		return dateutil.parser.parse(csvFail[-1][0])
 	def lisaFaili(failiNimi, järg):
+		with open(failiNimi, mode ='r', encoding='utf-8')as elektriHinnaFail:
+			csvFail = list(csv.reader(elektriHinnaFail))
+		päis = ['Kuupäev']
+		päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
+		salvestatudPäis = csvFail[0]
 		with open(failiNimi, mode='a', encoding='utf-8') as elektriHinnaFail:
 			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 			lisandused = 0
+			if not päis == salvestatudPäis:
+						csvFail.writerow(päis)
 			for aeg in range(len(salvestamataAndmed)):
 				if järg < list(salvestamataAndmed.keys())[aeg]:
 					lisandused += 1
-					csvFail.writerow([str(list(salvestamataAndmed.keys())[aeg]), (salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]]["Hind"]), salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]]["sees"]])
+					rida = [str(list(salvestamataAndmed.keys())[aeg]), salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[1]], round(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[2]],2)]
+					for seade in range(3,len(päis)):
+						rida.append(booleanTekstiks(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[seade]]))
+					csvFail.writerow(rida)
 		return lisandused
 	# Otsi õige kaust ja fail!
 	if os.path.exists(kaustaNimi):
@@ -208,7 +221,6 @@ def lülitaHinnaTeravikulElekterVälja(elektriAndmed, teravikuKõrgus, akuMaht, 
 	'''
 	print(seade+":")
 	for aeg in range(len(elektriAndmed)):
-		elektriAndmed[list(elektriAndmed.keys())[aeg]][seade]=True
 		if aeg>0:
 			if elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"] > (elektriAndmed[list(elektriAndmed.keys())[aeg-1]]["Hind"]+teravikuKõrgus):
 				print("Järsk Hinna Tõus kell "+list(elektriAndmed.keys())[aeg].strftime("%H:%M (%d.%m.%Y) - ")+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg-1]]["Hind"]),2))+"¢/kWh -> "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]),2))+"¢/kWh!")	
@@ -218,6 +230,7 @@ def lülitaHinnaTeravikulElekterVälja(elektriAndmed, teravikuKõrgus, akuMaht, 
 						if (elektriAndmed[list(elektriAndmed.keys())[aeg+teravikuAeg]]["Hind"]+teravikuKõrgus) < (elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]):
 							print(str(teravikuAeg)+" tunniks, Lülitan Elektri Välja")
 							for muudetavAeg in range(aeg, aeg+teravikuAeg):
+								#print("Lülitan "+list(elektriAndmed.keys())[muudetavAeg].strftime("%H:%M (%d.%m.%Y) Elektri välja"))
 								elektriAndmed[list(elektriAndmed.keys())[muudetavAeg]][seade]=False
 							break
 
@@ -251,19 +264,17 @@ def lülitaSoodsaimalKeskmiselTunnilSisse(elektriAndmed, kasutusAeg, seadmeNimi)
 	kasutusAeg on tundides, kaua elekter sees on
 	'''
 	print(seadmeNimi+":")
-	for aeg in range(len(elektriAndmed)):
-		elektriAndmed[list(elektriAndmed.keys())[aeg]][seadmeNimi] = False
 	soodsaimaElektriAeg = 0
 	for aeg in range(len(elektriAndmed)):
-		if elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"] < elektriAndmed[list(elektriAndmed.keys())[soodsaimaElektriAeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]:
+		if elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"] < elektriAndmed[list(elektriAndmed.keys())[soodsaimaElektriAeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"] and (aeg+kasutusAeg-1) < len(elektriAndmed):
 			for keskmiseAjad in range(soodsaimaElektriAeg, soodsaimaElektriAeg+kasutusAeg):
 				elektriAndmed[list(elektriAndmed.keys())[keskmiseAjad]][seadmeNimi] = False
 			soodsaimaElektriAeg = aeg
 			for keskmiseAjad in range(aeg, aeg+kasutusAeg):
-				#print("Lülitan "+list(elektriAndmed.keys())[keskmiseAjad].strftime("%H:%M (%d.%m.%Y)")+" Elektri Välja!")
+				#print("Lülitan "+list(elektriAndmed.keys())[keskmiseAjad].strftime("%H:%M (%d.%m.%Y)")+" Elektri Sisse, Kuna Jooksev Keskmine on "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]),2))+"¢/kWh!")
 				elektriAndmed[list(elektriAndmed.keys())[keskmiseAjad]][seadmeNimi] = True
 	print("Soodsaim "+str(kasutusAeg)+"t keskmine on "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[soodsaimaElektriAeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]),2))+list(elektriAndmed.keys())[soodsaimaElektriAeg].strftime("¢/kWh [%H:%M (%d.%m.%Y)]"))
-	print("Lülitan Elektri "+list(elektriAndmed.keys())[soodsaimaElektriAeg].strftime("%H:%M (%d.%m.%Y) - ")+list(elektriAndmed.keys())[soodsaimaElektriAeg+kasutusAeg].strftime("%H:%M (%d.%m.%Y) Sisse!"))
+	print("Lülitan Elektri "+list(elektriAndmed.keys())[soodsaimaElektriAeg].strftime("%H:%M (%d.%m.%Y) - ")+(list(elektriAndmed.keys())[soodsaimaElektriAeg+(kasutusAeg-1)]+timedelta(hours=1)).strftime("%H:%M (%d.%m.%Y) Sisse!"))
 
 
 
@@ -325,7 +336,9 @@ if __name__ == '__main__':
 	print("--------------------------------------------------")
 	lülitaElekter(kõikHinnad, True, "Paul-Kontor")
 	for seade in ajutisedRadiaatorid:
+		lülitaElekter(kõikHinnad, True, seade)
 		lülitaHinnaTeravikulElekterVälja(kõikHinnad, 30, akudeMaht, seade)
+	lülitaElekter(kõikHinnad, False, ajutisedSeadmed[0])
 	lülitaSoodsaimalKeskmiselTunnilSisse(kõikHinnad,akudeMaht,ajutisedSeadmed[0])
 	print("\n--------------------------------------------------")
 	print("STATISTIKA")
@@ -339,3 +352,7 @@ if __name__ == '__main__':
 	print("ARHIVEERIN")
 	print("--------------------------------------------------")
 	salvestaArhiiviInfo(arhiiviKaust,kõikHinnad)
+	if silumine:
+		print("SILUR SEES")
+	else:
+		return 0
