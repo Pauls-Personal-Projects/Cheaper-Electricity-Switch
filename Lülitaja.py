@@ -31,6 +31,7 @@ from datetime import datetime, timezone, timedelta	# API Kellaaja konverteerimis
 from dateutil import tz, parser						# API Kellaaja konverteerimiseks
 import dateutil										# API Kellaaja konverteerimiseks
 import time											# Sleepi jaoks mida lülitite kontrollil läheb vaja
+import sys											# Veateate Edastamiseks Synology DSM'ile
 
 
 
@@ -46,7 +47,7 @@ jooksevFail = "Elektri_Jooksev_Kasutus.csv" # IDE Kaust
 graafikuteKaust = "Graafikud" # IDE Kaust
 #jooksevFail = "/volume1/homes/Paul/Drive/Ajutine/Elektri_Jooksev_Kasutus.csv" # Pilve Kaust
 #graafikuteKaust = "/volume1/Failid/Elektri Kasutus Graafikud" # Pilve Kaust
-silumine = False
+silumine = True
 
 
 
@@ -177,6 +178,4 @@ if __name__ == "__main__":
 	loop.run_until_complete(ühendaSmartThingsi())
 	print("--------------------------------------------------")
 	if silumine:
-		print("SILUR SEES")
-	else:
-		return 0
+		sys.exit(1)

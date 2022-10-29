@@ -24,6 +24,7 @@ import dateutil										# API Kellaaja konverteerimiseks
 import matplotlib.pyplot as joonesta				# Elektrihinna joonestamiseks
 import os											# Failide Salvestamiseks ja Lugemiseks
 import csv											# Failide Salvestamiseks ja Lugemiseks
+import sys											# Veateate Edastamiseks Synology DSM'ile
 
 
 
@@ -353,6 +354,4 @@ if __name__ == '__main__':
 	print("--------------------------------------------------")
 	salvestaArhiiviInfo(arhiiviKaust,kõikHinnad)
 	if silumine:
-		print("SILUR SEES")
-	else:
-		return 0
+		sys.exit(1)
