@@ -9,7 +9,7 @@
 '''
 Looja:		Paul J. Aru        -    https://github.com/paulpall
 Kuupäev:	21/09/2022
-Uuendatud:	15/10/2022
+Uuendatud:	14/02/2023
 ------------------------------------------------------------
 Tänud	Andrew Sayre, pysmartthings teegi loomise eest
 Link: https://github.com/andrewsayre/pysmartthings
@@ -32,6 +32,7 @@ from dateutil import tz, parser						# API Kellaaja konverteerimiseks
 import dateutil										# API Kellaaja konverteerimiseks
 import time											# Sleepi jaoks mida lülitite kontrollil läheb vaja
 import sys											# Veateate Edastamiseks Synology DSM'ile
+import Votmed
 
 
 
@@ -40,14 +41,11 @@ import sys											# Veateate Edastamiseks Synology DSM'ile
 ####################################################################################################
 #    SÄTTED                                                                                        #
 ####################################################################################################
-### PEIDA ENNE GIT'i LAADIMIST ###
-SmartThingsi_Ligipääsu_Token = ''
-### PEIDA ENNE GIT'i LAADIMIST ###
 jooksevFail = "Elektri_Jooksev_Kasutus.csv" # IDE Kaust
 graafikuteKaust = "Graafikud" # IDE Kaust
 #jooksevFail = "/volume1/homes/Paul/Drive/Ajutine/Elektri_Jooksev_Kasutus.csv" # Pilve Kaust
 #graafikuteKaust = "/volume1/Failid/Elektri Kasutus Graafikud" # Pilve Kaust
-silumine = True
+silumine = False
 
 
 
@@ -158,7 +156,7 @@ async def loetleSeadmed(rakendusliides):
 
 async def ühendaSmartThingsi():
 	async with aiohttp.ClientSession() as session:
-		api = pysmartthings.SmartThings(session, SmartThingsi_Ligipääsu_Token)
+		api = pysmartthings.SmartThings(session, Votmed.SmartThingsi_Ligipääsu_Token)
 		await loetleAsukohad(api)
 		await loetleSeadmed(api)
 

@@ -1,2 +1,4 @@
-
 .DS_Store
+Votmed.py
+.gitsecret/keys/random_seed
+__pycache__
