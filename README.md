@@ -1,4 +1,4 @@
-# Smarter-Electricity-Usage
+# Cheaper-Electricity-Switch
 
 ### 🇬🇧
 ##### This is an Internet of Things Electricity Market Project that combines cheap Smart Plugs with Automated Python Scripts to Minimize the Use of Electricity at Peak Price Hours.
