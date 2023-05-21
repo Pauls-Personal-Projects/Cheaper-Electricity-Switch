@@ -2,401 +2,661 @@
 # -*- coding: utf-8 -*-
 
 ####################################################################################################
-#																								   #
-#											ELEKTRIHIND											   #
-#																								   #
+#                                                                                                  #
+#                                           ELEKTRIHIND                                            #
+#                                                                                                  #
 ####################################################################################################
 '''
-Looja:		Paul J. Aru		-	https://github.com/paulpall
-Kuupäev:	25/06/2022
-Uuendatud:	14/02/2023
+Looja:        Paul J. Aru        -    https://github.com/paulpall
+Kuupäev:    25/06/2022
+Uuendatud:    20/05/2023
+
+TODO:
+Vaata Muutuja nimed üle
+Vaata Meetodi Kirjeldused üle
+Lisa Synology Logimine
 '''
 
 
 
 ####################################################################################################
-#	TEEGID																						   #
+#    TEEGID                                                                                        #
 ####################################################################################################
-import requests										# Eleringi APIga Ühendumiseks
-from datetime import datetime, timezone, timedelta	# API Kellaaja konverteerimiseks
-from dateutil import tz								# API Kellaaja konverteerimiseks
-import dateutil										# API Kellaaja konverteerimiseks
-import matplotlib.pyplot as joonesta				# Elektrihinna joonestamiseks
-import os											# Failide Salvestamiseks ja Lugemiseks
-import csv											# Failide Salvestamiseks ja Lugemiseks
-import sys											# Veateate Edastamiseks Synology DSM'ile
-
-
-
-
-
-####################################################################################################
-#	SÄTTED																						   #
-####################################################################################################
-akudeMaht = 1 #Kauaks elektri võib välja lülitada
-#võrguAadress ="https://dashboard.elering.ee/api/nps/price/EE/current"	#Eleringi Praeguse Elektrihinna API
-võrguAadress ="https://dashboard.elering.ee/api/nps/price?start=" #+ 2022-09-22T09%3A40%3A00.000Z&end=2022-09-23T00%3A00%3A00.000Z"
-jooksevFail = "Elektri_Jooksev_Kasutus.csv" #IDE Kaust
-arhiiviKaust = "Elektri_TuruHind" #IDE Kaust
-#jooksevFail = "/volume1/homes/Paul/Drive/Ajutine/Elektri_Jooksev_Kasutus.csv" #Pilve Kaust
-#arhiiviKaust = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
-#Ajavahemik Elektrihindade Vaatamiseks:
-algAeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))-timedelta(hours=akudeMaht+1) #lahutame kaks tundi, et hetke hinnamuutust näha
-lõppAeg = algAeg+timedelta(days=2)
-### AJUTINE ###
-ajutisedSeadmed = ["Köök-Nõudepesumasin", "Paul-Kontor"]
-ajutisedRadiaatorid = ["Garderoob-Radiaator", "Paul-Radiaator", "Magamis-Radiaator"]
-### AJUTINE ###
-silumine = False
+import requests								# Eleringi APIga Ühendumiseks.
+from datetime import datetime, timedelta	# API Kellaaja konverteerimiseks.
+from dateutil import tz, parser				# API Kellaaja konverteerimiseks.
+from pytz import timezone					# Ajatsooni määramiseks.
+import os									# Failide Salvestamiseks ja Lugemiseks.
+import csv									# Failide Salvestamiseks ja Lugemiseks.
+from inspect import signature				# Algoritmide Parameetritele Ligipääsemiseks.
+import GoogleKalender
+from Lülitaja import silumine				# Veateate Edastamiseks Synology DSM'ile.
 
 
 
 
 
 ####################################################################################################
-#	TUGIFUNKTSIOONID																			   #
+#    SÄTTED                                                                                        #
 ####################################################################################################
-def elektriMaksustamine(börsiHind):
-	tarbijaHind = float(börsiHind)*1.2		# Lisan Käibemaksu
-	tarbijaHind = float(tarbijaHind)/10	# Konverteerin €/MWh -> ¢/kWh
-	return tarbijaHind
-
-
-
-
-
-####################################################################################################
-#	ALLALAADIMISE FUNKTSIOONID																	   #
-####################################################################################################
-def vormiKuupäevadAadressi(algKuupäev, lõppKuupäev):
-	eraldaja = "%%3A"
-	algusKuupäev=algKuupäev.astimezone().replace(tzinfo=tz.gettz('Europe/Tallinn')).astimezone(tz.tzutc())
-	lõpuKuupäev=lõppKuupäev.astimezone().replace(tzinfo=tz.gettz('Europe/Tallinn')).astimezone(tz.tzutc())
-	kuupäevad = algusKuupäev.strftime("%Y-%m-%dT%H"+eraldaja+"%M"+eraldaja+"00.000Z&end=")+lõpuKuupäev.strftime("%Y-%m-%dT%H"+eraldaja+"%M"+eraldaja+"00.000Z")
-	return kuupäevad
-
-
-
-def viimaneElektriHind(apiAadress):
-	APIvastus = requests.get(võrguAadress).json()
-	if APIvastus["success"]:
-		kuupäev=datetime.fromtimestamp(APIvastus["data"][0]["timestamp"])
-		hind=elektriMaksustamine(APIvastus["data"][0]["price"])
-		print("Kuupäev: "+kuupäev.strftime("%d.%m.%Y (%H:%M)"))
-		print("Hind: "+str(hind)+"¢/kWh")
-	else:
-		print("Viga: "+requests.get(võrguAadress).status_code+" (Kontrolli Eleringi API't)")
-		silumine = True
-		
-		
-		
-def elektriHindVahemikus(algKuupäev, lõppKuupäev, apiAadress):
-	print("Küsin Elektrihinda Vahemikus "+algKuupäev.strftime("%d.%m.%Y(%H:%M)")+" - "+lõppKuupäev.strftime("%d.%m.%Y(%H:%M)"))
-	APIvastus = requests.get(võrguAadress+vormiKuupäevadAadressi(algKuupäev, lõppKuupäev)).json()
-	if APIvastus["success"]:
-		elektriHinnad = {}
-		for aeg in APIvastus["data"]["ee"]:
-			elektriHinnad[datetime.fromtimestamp(aeg["timestamp"])]={"Hind":aeg["price"]}
-		print("Vastati Elektrihinnaga Vahemikus "+list(elektriHinnad.keys())[0].strftime("%d.%m.%Y(%H:%M)")+" - "+list(elektriHinnad.keys())[-1].strftime("%d.%m.%Y(%H:%M)"))
-		return elektriHinnad
-	else:
-		print("Viga: "+requests.get(võrguAadress).status_code+" (Kontrolli Eleringi API't)")
-		silumine = True
+# Eleringi Elektrihinna Vahemiku Aadress API
+ELERINGI_LINK = "https://dashboard.elering.ee/api/nps/price?start="
+#+ 2022-09-22T09%3A40%3A00.000Z&end=2022-09-23T00%3A00%3A00.000Z"
+# Kaust Kuhu Arhiveeritakse Kõik Andmed
+ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
+#ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
+AJATSOON = timezone('Europe/Tallinn')
+API_ERALDAJA = "%%3A"
 
 
 
 
 
 ####################################################################################################
-#	SALVESTUS FUNKTSIOONID																		   #
+#    ALLALAADIMISE FUNKTSIOONID                                                                    #
 ####################################################################################################
-def booleanTekstiks(olek):
-	if olek:
-		tekst = "sees"
-	else:
-		tekst = "väljas"
-	return tekst
+def _kuupäevad_API_vormingus(alg_aeg:datetime, lõpp_aeg:datetime):
+    '''
+    Vormib Kuupäevad Eleringi API Päringu Aadressis Oodatud Formaati.
+    '''
+    alg_kuupäev=alg_aeg.astimezone().replace(tzinfo=tz.gettz('Europe/Tallinn')).astimezone(tz.tzutc())
+    lõpp_kuupäev=lõpp_aeg.astimezone().replace(tzinfo=tz.gettz('Europe/Tallinn')).astimezone(tz.tzutc())
+    vormitud_kuupäev = alg_kuupäev.strftime("%Y-%m-%dT%H"
+        +API_ERALDAJA+"%M"+API_ERALDAJA+"00.000Z&end=")+lõpp_kuupäev.strftime("%Y-%m-%dT%H"
+        +API_ERALDAJA+"%M"+API_ERALDAJA+"00.000Z")
+    return vormitud_kuupäev
 
 
 
-# .csv Rea Konstrueerimine salvestamataAndmed andmesõnastikust
-def csvReaKonstruktor(reaPäis, reaJärg, salvestamataAndmed):
-	#Kuupäev, Hind
-	rida = [str(list(salvestamataAndmed.keys())[reaJärg]), salvestamataAndmed[list(salvestamataAndmed.keys())[reaJärg]][reaPäis[1]]]
-	for tulp in range(2,len(reaPäis)):
-		#Jooksvad Keskmised Hinnad
-		if ". Tunni Keskmine" in reaPäis[tulp]:
-			rida.append(round(salvestamataAndmed[list(salvestamataAndmed.keys())[reaJärg]][reaPäis[tulp]],2))
-		#Lülitite Olekud
-		else:
-			rida.append(booleanTekstiks(salvestamataAndmed[list(salvestamataAndmed.keys())[reaJärg]][reaPäis[tulp]]))
-	return rida
-
-
-
-def salvestaJooksevInfo(failiNimi, salvestamataAndmed):
-	# Elektrihinna CSV Faili Formaat:
-	def salvesta():
-		with open(failiNimi, mode='w', encoding='utf-8') as elektriHinnaFail:
-			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-			päis = ['Kuupäev']
-			päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
-			csvFail.writerow(päis)
-			for aeg in range(len(salvestamataAndmed)):
-					csvFail.writerow(csvReaKonstruktor(päis, aeg, salvestamataAndmed))
-		'''
-		with open(failiNimi, mode='w', encoding='utf-8') as elektriHinnaFail:
-			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-			päis = ['Kuupäev']
-			päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
-			csvFail.writerow(päis)
-			for aeg in range(len(salvestamataAndmed)):
-				rida = [str(list(salvestamataAndmed.keys())[aeg]), salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[1]], round(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[2]],2)]
-				for seade in range(3,len(päis)):
-					rida.append(booleanTekstiks(salvestamataAndmed[list(salvestamataAndmed.keys())[aeg]][päis[seade]]))
-				csvFail.writerow(rida)
-		'''
-	# Võrdleb Antud Infot Salvestatuga
-	if os.path.exists(failiNimi):
-		with open(failiNimi, mode ='r', encoding='utf-8')as elektriHinnaFail:
-			csvFail = list(csv.reader(elektriHinnaFail))
-		print("Viimane Salvestatud Elektrihind: "+dateutil.parser.parse(csvFail[-1][0]).strftime("%H:%M (%d.%m.%Y) - ")+str(round(elektriMaksustamine(csvFail[-1][1]),2))+"¢/kWh")
-		print("Viimane Mälus Elektrihind (Eleringilt): "+list(salvestamataAndmed.keys())[-1].strftime("%H:%M (%d.%m.%Y) - ")+str(round(elektriMaksustamine(list(salvestamataAndmed.values())[-1]["Hind"]),2))+"¢/kWh")
-		if dateutil.parser.parse(csvFail[-1][0])<list(salvestamataAndmed.keys())[-1]:
-			print("Uuendan Jooksvat Elektrihinda: "+failiNimi)
-			salvesta()
-		else:
-			print("Ajakohane Jooksev Elektrihind on Juba Olemas: "+failiNimi)
-	else:
-		print("Salvestan Jooksva Elektrihinna: "+failiNimi)
-		salvesta()
-
-
-
-# This is a Horrible Mess
-def salvestaArhiiviInfo(kaustaNimi, salvestamataAndmed):
-	def looFail(failiNimi, järg):
-		with open(failiNimi, mode='w', encoding='utf-8') as elektriHinnaFail:
-			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-			päis = ['Kuupäev']
-			päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
-			csvFail.writerow(päis)
-			for aeg in range(len(salvestamataAndmed)):
-				if järg <= list(salvestamataAndmed.keys())[aeg]:
-					csvFail.writerow(csvReaKonstruktor(päis, aeg, salvestamataAndmed))
-		print(str(len(salvestamataAndmed))+" näitu arhiveeritud faili: "+failiNimi)
-		
-	def loeFaili(failiNimi):
-		with open(failiNimi, mode ='r', encoding='utf-8')as elektriHinnaFail:
-			csvFail = list(csv.reader(elektriHinnaFail))
-			return csvFail
-			
-	def lisaFaili(failiNimi, järg):
-		päis = ['Kuupäev']
-		päis.extend(list(salvestamataAndmed[list(salvestamataAndmed.keys())[0]].keys()))
-		salvestatudPäis = loeFaili(failiNimi)[0]
-		with open(failiNimi, mode='a', encoding='utf-8') as elektriHinnaFail:
-			csvFail = csv.writer(elektriHinnaFail, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-			lisandused = 0
-			if not päis == salvestatudPäis:
-				print("PÄIS ON MUUTUNUD???")
-				print("Salvestatud: "+str(salvestatudPäis))
-				print("Uus: "+str(päis))
-				csvFail.writerow(päis)
-			for aeg in range(len(salvestamataAndmed)):
-				if järg < list(salvestamataAndmed.keys())[aeg] and list(salvestamataAndmed.keys())[aeg].month == dateutil.parser.parse(loeFaili(failiNimi)[1][0]).month:
-					lisandused += 1
-					csvFail.writerow(csvReaKonstruktor(päis, aeg, salvestamataAndmed))
-				elif järg < list(salvestamataAndmed.keys())[aeg] and not list(salvestamataAndmed.keys())[aeg].month == dateutil.parser.parse(loeFaili(failiNimi)[1][0]).month:
-					print(str(lisandused)+" näitu arhiveeritud faili: "+failiNimi)
-					return list(salvestamataAndmed.keys())[aeg]
-					#break
-		print(str(lisandused)+" näitu arhiveeritud faili: "+failiNimi)
-		return list(salvestamataAndmed.keys())[aeg]
-	# Otsi õige kaust ja fail!
-	if os.path.exists(kaustaNimi):
-		if os.path.exists(kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year)):
-			arhiiviFail = (kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year)+"/"+list(salvestamataAndmed.keys())[0].strftime("Elektri_turuhind_%m-%Y.csv"))
-			if os.path.exists(arhiiviFail):
-				viimaneInfo = loeFaili(arhiiviFail)
-				if not dateutil.parser.parse(viimaneInfo[-1][0]) == None:
-					järg = dateutil.parser.parse(viimaneInfo[-1][0])
-				else:
-					print("VIGA: Tühi Fail on Tekkinud! ("+arhiiviFail+")")
-					silumine = True
-				if dateutil.parser.parse(viimaneInfo[-1][0]) < list(salvestamataAndmed.keys())[-1]:
-					kuuJärg = lisaFaili(arhiiviFail, järg)
-					if not kuuJärg.month == järg.month:
-						arhiiviFail = (kaustaNimi+kuuJärg.strftime("/%Y/Elektri_turuhind_%m-%Y.csv"))
-						if os.path.exists(arhiiviFail):
-							print("Kuu lõpp, Jätkan Uues Failis")
-							lisaFaili(arhiiviFail, kuuJärg)
-						else:
-							if not os.path.exists(kaustaNimi+kuuJärg.strftime("/%Y")):
-								os.mkdir(kaustaNimi+kuuJärg.strftime("/%Y"))
-							print("Kuu lõppes, Teen Uue Faili")
-							looFail(arhiiviFail, kuuJärg)
-				else:
-					print("Viimane info on juba hoiustatud! "+dateutil.parser.parse(viimaneInfo[-1][0]).strftime("[%H:%M (%d.%m.%Y)]"))
-			else:
-				print("Uus Kuu, Uus Fail!")
-				looFail(kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year)+"/"+list(salvestamataAndmed.keys())[0].strftime("Elektri_turuhind_%m-%Y.csv"),0)
-		else:
-			print("Head Uut Aastat "+str(list(salvestamataAndmed.keys())[0].year)+"!")
-			os.mkdir(kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year))
-			looFail(arhiiviFail)
-	else:
-		print("Ei leidnud "+kaustaNimi+"! Loon uue arhiivi kausta.")
-		os.mkdir(kaustaNimi)
-		os.mkdir(kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year))
-		arhiiviFail = (kaustaNimi+"/"+str(list(salvestamataAndmed.keys())[0].year)+"/"+list(salvestamataAndmed.keys())[0].strftime("Elektri_turuhind_%m-%Y.csv"))
-		looFail(arhiiviFail)
+def _elektri_hind_vahemikus(alg_aeg:datetime, lõpp_aeg:datetime, api_aadress:str):
+    '''
+    Saadab Eleringi APIle Päringu Elektrituru Hindade Kohta Antud Ajavahemikus.
+    '''
+    print("Küsin Elektrihinda Vahemikus "+alg_aeg.strftime("%d.%m.%Y(%H:%M)")+
+          " - "+lõpp_aeg.strftime("%d.%m.%Y(%H:%M)"))
+    api_päring = requests.get(api_aadress+_kuupäevad_API_vormingus(alg_aeg, lõpp_aeg)).json()
+    if api_päring["success"]:
+        elektri_hinnad = []
+        for aeg in api_päring["data"]["ee"]:
+            elektri_hinnad.append(
+                {"Kuupäev":AJATSOON.localize(datetime.fromtimestamp(aeg["timestamp"])), "Hind":aeg["price"]})
+        print("Vastati Elektrihinnaga Vahemikus "+
+              elektri_hinnad[0]["Kuupäev"].strftime("%d.%m.%Y(%H:%M)")+" - "+
+              elektri_hinnad[-1]["Kuupäev"].strftime("%d.%m.%Y(%H:%M)"))
+        return elektri_hinnad
+    else:
+        print("VIGA: Elering ("+requests.get(api_aadress).status_code+")")
+        global silumine
+        silumine = True
 
 
 
 
 
 ####################################################################################################
-#	HINNA ANALÜÜSI FUNKTSIOONID																	   #
+#    ANDMETÖÖTLUS                                                                                  #
 ####################################################################################################
-def lülitaHinnaTeravikulElekterVälja(elektriAndmed, teravikuKõrgus, akuMaht, seade):
-	'''
-	(Annaks Optimeerida) Otsib millal hind tõuseb järsult hetkeks!
-	teravikuKõrgus on €/MWh, tähistab millal elekter välja lülitada
-	akuMaht on tundides, tähistab kaua elekter väljas on
-	'''
-	print(seade+": Otsin Kalleid Aegu Elektri Välja Märkimiseks")
-	for aeg in range(len(elektriAndmed)):
-		if aeg>0:
-			if elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"] > (elektriAndmed[list(elektriAndmed.keys())[aeg-1]]["Hind"]+teravikuKõrgus):
-				print("Järsk Hinna Tõus kell "+list(elektriAndmed.keys())[aeg].strftime("%H:%M (%d.%m.%Y) - ")+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg-1]]["Hind"]),2))+"¢/kWh -> "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]),2))+"¢/kWh!")	
-				for teravikuAeg in range(1, akuMaht+1):
-					if (aeg+teravikuAeg)<(len(elektriAndmed)-1):
-						#print("Võrdlen kas "+str(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg+teravikuAeg]]["Hind"]+teravikuKõrgus))+" on väiksem, kui "+str(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"])))
-						if (elektriAndmed[list(elektriAndmed.keys())[aeg+teravikuAeg]]["Hind"]+teravikuKõrgus) < (elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]):
-							print(str(teravikuAeg)+" tunniks, Lülitan Elektri Välja")
-							for muudetavAeg in range(aeg, aeg+teravikuAeg):
-								#print("Lülitan "+list(elektriAndmed.keys())[muudetavAeg].strftime("%H:%M (%d.%m.%Y) Elektri välja"))
-								elektriAndmed[list(elektriAndmed.keys())[muudetavAeg]][seade]=False
-							break
+class ElektriAndmed:
+    '''
+    Kõik Elektri Hinna ja Voolu Lülititega Andmetega Seonduv.
+    ''' 
+    def __init__(oma):
+        '''
+        #Loob Uue ElektriAndmed Andmetüübi.
+        '''
+        oma._tabel = []
 
 
 
-def lisaJooksevKeskmineHind(elektriAndmed, kasutusAeg):
-	'''
-	Arvutab Jooksva Keskmise Järgnevate Tundidega
-	kasutusAeg on tundides, kaua elekter sees on
-	'''
-	for aeg in range(len(elektriAndmed)):
-		keskmineHind = 0
-		if aeg < (len(elektriAndmed)-(kasutusAeg-1)):
-			for keskmiseHinnaTund in range(aeg, aeg+kasutusAeg):
-				#print("Keskmine "+str(aeg)+": Lisan "+list(elektriAndmed.keys())[keskmiseHinnaTund].strftime("[%H:%M (%d.%m.%Y)]")+" hinna ("+str(elektriAndmed[list(elektriAndmed.keys())[keskmiseHinnaTund]]["Hind"])+")")
-				keskmineHind += elektriAndmed[list(elektriAndmed.keys())[keskmiseHinnaTund]]["Hind"]
-			elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]=keskmineHind/kasutusAeg
-			#print("Keskmine Hind: "+str(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]))
-		else:
-			for keskmiseHinnaTund in range(aeg, len(elektriAndmed)):
-				#print("Poolik Keskmine "+str(aeg)+": Lisan "+list(elektriAndmed.keys())[keskmiseHinnaTund].strftime("[%H:%M (%d.%m.%Y)]")+" hinna ("+str(elektriAndmed[list(elektriAndmed.keys())[keskmiseHinnaTund]]["Hind"])+")")
-				keskmineHind += elektriAndmed[list(elektriAndmed.keys())[keskmiseHinnaTund]]["Hind"]
-			elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]=keskmineHind/(len(elektriAndmed)-aeg)
-			#print("Keskmine Hind: "+str(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]))
+    def __repr__(oma):
+        '''
+        Tõlgendab ElektriAndmed Teksti Vormingusse.
+        '''
+        if len(oma._tabel) > 0:
+            päis = list(oma._tabel[0].keys())
+            tabeli_laius = 1
+            for lahter in päis:
+                if len(lahter) > len(str(oma._tabel[0][lahter])):
+                    tabeli_laius+=len(lahter)+3
+                else:
+                    tabeli_laius+=len(str(oma._tabel[0][lahter]))+3
+            tekst='-'*tabeli_laius+"\n|"
+            # PÄIS
+            for tulp, lahter in oma._tabel[0].items():
+                tühimik=len(str(lahter))-len(tulp)
+                if len(tulp) > len(str(lahter)):
+                    tekst+=' '
+                else:
+                    tekst+=' '*int(tühimik/2+1)
+                tekst+=tulp
+                if len(tulp) > len(str(lahter)):
+                    tekst+=" |"
+                else:
+                    tekst+=' '*int(-(-tühimik//2)+1)+'|'
+            tekst+="\n"+'-'*tabeli_laius+"\n"
+            # ANDMED
+            for rida in oma._tabel:
+                tekst+='|'
+                for tulp, lahter in rida.items():
+                    if isinstance(lahter, float):
+                        väärtus=f'{lahter:6.2f}'
+                    else:
+                        väärtus=str(lahter)
+                    tühimik=len(tulp)-len(väärtus)
+                    # Teksti Konstruktor
+                    if len(väärtus) > len(tulp):
+                        tekst+=' '
+                    else:
+                        tekst+=' '*int(tühimik/2+1)
+                    tekst+=väärtus
+                    if len(väärtus) > len(tulp):
+                        tekst+=" |"
+                    else:
+                        tekst+=' '*int(-(-tühimik//2)+1)+'|'
+                tekst+="\n"
+            tekst+='-'*tabeli_laius
+            return tekst
+        else:
+            return str(oma._tabel)
 
 
 
-def lülitaSoodsaimalKeskmiselTunnilSisse(elektriAndmed, kasutusAeg, seadmeNimi):
-	'''
-	Lülitab Kõikidel Tundidel Elektri Välja Peale Jooksva Keskmise
-	kasutusAeg on tundides, kaua elekter sees on
-	'''
-	print(seadmeNimi+": Otsin Soodsaimat Aega Elektri Sisse Märkimiseks")
-	soodsaimaElektriAeg = 0
-	for aeg in range(len(elektriAndmed)):
-		if elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"] < elektriAndmed[list(elektriAndmed.keys())[soodsaimaElektriAeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"] and (aeg+kasutusAeg-1) < len(elektriAndmed):
-			for keskmiseAjad in range(soodsaimaElektriAeg, soodsaimaElektriAeg+kasutusAeg):
-				elektriAndmed[list(elektriAndmed.keys())[keskmiseAjad]][seadmeNimi] = False
-			soodsaimaElektriAeg = aeg
-			for keskmiseAjad in range(aeg, aeg+kasutusAeg):
-				#print("Lülitan "+list(elektriAndmed.keys())[keskmiseAjad].strftime("%H:%M (%d.%m.%Y)")+" Elektri Sisse, Kuna Jooksev Keskmine on "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[aeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]),2))+"¢/kWh!")
-				elektriAndmed[list(elektriAndmed.keys())[keskmiseAjad]][seadmeNimi] = True
-	print("Soodsaim "+str(kasutusAeg)+"t keskmine on "+str(round(elektriMaksustamine(elektriAndmed[list(elektriAndmed.keys())[soodsaimaElektriAeg]]["Jooksev "+str(kasutusAeg)+". Tunni Keskmine"]),2))+list(elektriAndmed.keys())[soodsaimaElektriAeg].strftime("¢/kWh [%H:%M (%d.%m.%Y)]"))
-	print("Lülitan Elektri "+list(elektriAndmed.keys())[soodsaimaElektriAeg].strftime("%H:%M (%d.%m.%Y) - ")+(list(elektriAndmed.keys())[soodsaimaElektriAeg+(kasutusAeg-1)]+timedelta(hours=1)).strftime("%H:%M (%d.%m.%Y) Sisse!"))
+    def loe_võrgust(oma, alg_aeg:datetime, lõpp_aeg:datetime):
+        '''
+        Andes Ajavahemiku, Määrab ElektriAndmete Väärtuseks
+        Eleringi Elektrihinnad Antud Ajavahemikust.
+        '''
+        oma._tabel = _elektri_hind_vahemikus(alg_aeg, lõpp_aeg, ELERINGI_LINK)
 
 
 
-def lülitaElekter(elektriAndmed, olek, seade):
-	for aeg in range(len(elektriAndmed)):
-		elektriAndmed[list(elektriAndmed.keys())[aeg]][seade]=olek
-	if olek:
-		print(seade+": Elekter Sisse Märgitud")
-	else:
-		print(seade+": Elekter Välja Märgitud")
+    def _loe_failist(oma, fail:str):
+        '''
+        Lisab Ühe Kuu ElektriAndmed Antud .csv Failist.
+        '''
+        with open(fail, mode ='r', encoding='utf-8')as csv_fail:
+            csv_tabel = list(csv.reader(csv_fail))
+            #PÄIS
+            try:
+                päis = csv_tabel[0]
+            except:
+                print("VIGA:", fail, "On Tühi!")
+                global silumine
+                silumine = True
+            #ANDMED
+            for rida in csv_tabel:
+                if rida[0] == "Kuupäev":
+                    if rida != päis:
+                        päis = rida
+                else:
+                    andmepunkt = {}
+                    for andmetüüp in range(len(rida)):
+                        if päis[andmetüüp] == "Kuupäev":
+                            andmepunkt[päis[andmetüüp]]=parser.parse(rida[andmetüüp])
+                        elif päis[andmetüüp] == "Hind" or "Tunni Keskmine" in päis[andmetüüp]:
+                            andmepunkt[päis[andmetüüp]]=float(rida[andmetüüp])
+                        else:
+                            andmepunkt[päis[andmetüüp]]=oma._booleani_tõlge(rida[andmetüüp])
+                    oma._tabel.append(andmepunkt)
+
+
+
+    def loe_ajavahemik(oma, kaust:str, alg_aeg:datetime, lõpp_aeg:datetime):
+        '''
+        Andes Ajavahemiku, Määrab ElektriAndmete Väärtuseks
+        Antud Kaustast ning Antud Ajavahemikust Andmed.
+        '''
+        for aasta in range(alg_aeg.year, lõpp_aeg.year+1):
+            if lõpp_aeg.month < alg_aeg.month:
+                lõpp_kuu = 12
+            else:
+                lõpp_kuu = lõpp_aeg.month
+            for kuu in range(alg_aeg.month, lõpp_kuu+1):
+                kuu_fail = (kaust+"/"+str(aasta)+"/Elektri_turuhind_"
+                			+f'{kuu:02d}'+"-"+str(aasta)+".csv")
+                if os.path.exists(kuu_fail):
+                    oma._loe_failist(kuu_fail)
+
+
+
+    def _kirjuta_faili(oma, fail:str, alg_rida:int, lõpp_rida:int):
+        '''
+        Kirjutab Antud Ridade ElektriAndmed Antud .csv Faili.
+        '''
+        with open(fail, mode='w', encoding='utf-8') as csv_fail:
+            csv_tabel = csv.writer(csv_fail, delimiter=',',
+                                   quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            #PÄIS
+            päis = list(oma._tabel[0].keys())
+            csv_tabel.writerow(päis)
+            #ANDMED
+            for rida in range(alg_rida, lõpp_rida):
+                csv_rida=[]
+                if list(oma._tabel[rida].keys()) != päis:
+                    päis = list(oma._tabel[rida].keys())
+                    csv_tabel.writerow(päis)
+                for väärtus in list(oma._tabel[rida].values()):
+                    if isinstance(väärtus, bool):
+                        csv_rida.append(oma._booleani_tõlge(väärtus))
+                    else:
+                        csv_rida.append(väärtus)
+                csv_tabel.writerow(csv_rida)
+
+
+
+    def hoiusta_ajavahemik(oma, kaust:str, alg_aeg:datetime, lõpp_aeg:datetime):
+        '''
+        Andes Ajavahemiku, Kirjutab Kõik ElektriAndmed Antud Kausta, Aasta ning Kuu Kaupa.
+        '''
+        alg_järg = 0
+        lõpp_järg = 0
+        if not os.path.exists(kaust):
+            print("Ei leidnud "+kaust+"! Loon uue arhiivi kausta.")
+            os.mkdir(kaust)
+        for aasta in range(alg_aeg.year, lõpp_aeg.year+1):
+            if not os.path.exists(kaust+"/"+str(aasta)):
+                print("Lisan "+str(aasta)+" Kausta!")
+                os.mkdir(kaust+"/"+str(aasta))
+            if lõpp_aeg.month < alg_aeg.month:
+                lõpp_kuu = 12
+            else:
+                lõpp_kuu = lõpp_aeg.month
+            for kuu in range(alg_aeg.month, lõpp_kuu+1):
+                fail = kaust+"/"+str(aasta)+"/Elektri_turuhind_"+f'{kuu:02d}'+"-"+str(aasta)+".csv"
+                while lõpp_järg < len(oma._tabel) and oma._tabel[lõpp_järg]['Kuupäev'].month == kuu:
+                    lõpp_järg += 1
+                oma._kirjuta_faili(fail, alg_järg, lõpp_järg)
+                alg_järg = lõpp_järg
+
+
+
+    def sisaldab_andmetüüpi(oma, rida, andmetüüp):
+        '''
+        Kontrollib Kas Antud Andmetüüp on Olemas Oma ElektriAndmete Hulgas.
+        '''
+        if andmetüüp in list(oma._tabel[rida].keys()):
+            return True
+        else:
+            return False
+
+
+
+    def sisaldab_andmeid(oma, võrdlus_andmed, andmetüüp:str):
+        '''
+        Kontrollib Kas Mingi Andmetüüp Antud ElektriAndmetest on Olemas Oma ElektriAndmete Hulgas.
+        '''
+        võrdlus_järg = 0
+        for rida in oma._tabel:
+            if rida["Kuupäev"] == võrdlus_andmed._tabel[võrdlus_järg]["Kuupäev"]:
+                if rida[andmetüüp] != võrdlus_andmed._tabel[võrdlus_järg][andmetüüp]:
+                    return False
+                võrdlus_järg+=1
+        if võrdlus_järg == len(võrdlus_andmed._tabel):
+            return True
+        else:
+            return False
+
+
+
+    def kopeeri_andmed(oma, kopeeritavad_andmed):
+        '''
+        Lisab Andmed Antud ElektriAndmetest Oma ElektriAndmete Juurde.
+        '''
+        oma_rea_järg = None	#Kiirendab Andmete Uuendamist
+        muudetud_väljade_hulk = 0	#Huvi/Silumise Pärast
+        # Otsi Vanematest Andmetest Rida
+        def _leia_rida(dubleeritav_rida:dict):
+            '''
+            Otsib Oma ElektriAndmetest Üles Antud Rea.
+            '''
+            nonlocal oma_rea_järg
+            if oma_rea_järg is None:
+                oma_rea_järg = 0
+            for oma_rida in range(oma_rea_järg,len(oma._tabel)-1):
+                if oma._tabel[oma_rida]['Kuupäev'] == dubleeritav_rida['Kuupäev']:
+                    for tulp in list(dubleeritav_rida.keys()):
+                        if oma._tabel[oma_rida][tulp]!=dubleeritav_rida[tulp]:
+                            oma._tabel[oma_rida][tulp]=dubleeritav_rida[tulp]
+                            nonlocal muudetud_väljade_hulk
+                            muudetud_väljade_hulk+=1
+                    return oma_rida
+            return None
+        # Iga Uue Andmerea Kohta
+        for kopeeritav_rida in kopeeritavad_andmed._tabel:
+            oma_rea_järg = _leia_rida(kopeeritav_rida)
+            if oma_rea_järg is None:
+                oma._tabel.append(kopeeritav_rida)
+                muudetud_väljade_hulk+=len(kopeeritav_rida)
+        return muudetud_väljade_hulk
+
+
+
+    def _booleani_tõlge(oma, olek):
+        '''
+        Tõlgib Booleani Väärtuse Eesti Keelde, CSV Faili Jaoks.
+        OLEK võib olla kas tõeväärtus või sõne.
+        '''
+        if olek == "sees":
+            return True
+        elif olek == "väljas":
+            return False
+        elif olek:
+            return "sees"
+        elif not olek:
+            return "väljas"
+
+
+
+    def rakenda_rea_kaupa(oma, korraga:int, algoritm, parameetrid:list=[]):
+        '''
+        Töötleb Kõiki ElektriAndmete Ridu, Pakkudes Ligipääsu Mitmele Reale Korraga.
+        '''
+        if 1+len(parameetrid) != len(signature(algoritm).parameters):
+            print("VIGA: Küsitud Parameetrid "+str(list(signature(algoritm).parameters.keys()))+
+                  ", Antud Parameetrid "+str(parameetrid))
+            global silumine
+            silumine = True
+            return
+        for rea_arv in range(len(oma._tabel)):
+            if (rea_arv+korraga) < len(oma._tabel):
+                algoritmi_parameetrid = [oma._tabel[rea_arv:(rea_arv+korraga)]] + parameetrid
+                algoritm(*algoritmi_parameetrid)
+
+
+
+    def rakenda_reale(oma, alg_rida:int, lõpp_rida:int, algoritm, parameetrid:list=[]):
+        '''
+        Töötleb ElektriAndmete Ridu Ühekaupa.
+        '''
+        if 1+len(parameetrid) != len(signature(algoritm).parameters):
+            print("VIGA: Küsitud Parameetrid "+str(list(signature(algoritm).parameters.keys()))+
+                  ", Antud Parameetrid "+str(parameetrid))
+            global silumine
+            silumine = True
+            return
+        for rea_arv in range(alg_rida,lõpp_rida):
+            algoritmi_parameetrid = [[oma._tabel[rea_arv]]] + parameetrid
+            algoritm(*algoritmi_parameetrid)
+
+
+
+    def päeva_väikseim(oma, andmetüüp:str):
+        '''
+        Otsib Päeva Kaupa Antud Andmetüübi Väikseima Väärtuse.
+        '''
+        väikseimad_väärtused={}
+        for rea_arv in range(len(oma._tabel)):
+            for tulp in list(oma._tabel[rea_arv].keys()):
+                if not oma._tabel[rea_arv]["Kuupäev"].day in list(väikseimad_väärtused.keys()):
+                    väikseimad_väärtused[oma._tabel[rea_arv]["Kuupäev"].day] = rea_arv
+                elif (andmetüüp in tulp and
+                    oma._tabel[rea_arv][tulp] < oma._tabel[väikseimad_väärtused[oma._tabel[rea_arv]["Kuupäev"].day]][tulp]):
+                    väikseimad_väärtused[oma._tabel[rea_arv]["Kuupäev"].day] = rea_arv
+        return list(väikseimad_väärtused.values())
+
+
+
+    def väärtus_ajal(oma, kuupäev:datetime, andmetüüp:str):
+        '''
+        Annab Kuupäeva Järgi Antud Andmetüübi Väärtuse.
+        '''
+        #Paku Asukohta (Kiire):
+        ajavahe = kuupäev-oma._tabel[0]["Kuupäev"]
+        võimalik_järg = (ajavahe.days * 24 + ajavahe.seconds // 3600)-1
+        if oma._tabel[võimalik_järg]["Kuupäev"] == kuupäev:
+            return oma._tabel[võimalik_järg][andmetüüp]
+        #Otsi Asukohta (Aeglane):
+        for rida in oma._tabel:
+            if rida["Kuupäev"] == kuupäev:
+                return rida[andmetüüp]
+
+
+
+    def väärtus_real(oma, rida:int, andmetüüp:str):
+        '''
+        Annab Rea Järgi Antud Andmetüübi Väärtuse.
+        '''
+        return oma._tabel[rida][andmetüüp]
 
 
 
 
 
 ####################################################################################################
-#	STATISTIKA TUGIFUNKTSIOONID																	   #
+#    ELEKTRIANDMETE ANALÜÜSI ALGORITMID                                                            #
 ####################################################################################################
+def välja_uuendamine(read, andmetüüp:str, väärtus):
+    '''
+    Määrab Üksiku ElektriAndmed Välja Antud Väärtuseks.
+    '''
+    read[0][andmetüüp]=väärtus
+
+
+
+def välja_kustutamine(read, andmetüüp:str):
+    '''
+    Üksiku Välja Eemaldamine Elektriandmetest.
+    '''
+    for tulp in list(read[0].keys()):
+        if andmetüüp in tulp:
+            read[0].pop(tulp)
+
+
+
+def välja_lisamine_keskmine(read):
+    '''
+    Arvutab Jooksva Keskmise Hinna Järgnevate Tundidega.
+    '''
+    keskmine_hind = 0
+    for aeg in read:
+        keskmine_hind += aeg["Hind"]
+    read[0]["Jooksev "+str(len(read))+". Tunni Keskmine"]=keskmine_hind/len(read)
+
+
+
+def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrgus:int):
+    '''
+    Otsib Millal Hind Tõuseb Järsult Hetkeks!
+    TERAVIKUKÕRGUS on €/MWh, tähistab millal elekter välja lülitada.
+    '''
+    if (read[0]["Hind"]+teraviku_kõrgus) < read[1]["Hind"]:
+        print("Järsk Hinnatõus kell",
+              read[1]["Kuupäev"].strftime("%H:%M (%d.%m.%Y) -"),
+              str(round(maksusta_hind(read[0]["Hind"]),2))+"¢/kWh ->",
+              str(round(maksusta_hind(read[1]["Hind"]),2))+"¢/kWh!")
+        for teraviku_lõpp in range(2, len(read)):
+            if (read[1]["Hind"]-teraviku_kõrgus) > (read[teraviku_lõpp]["Hind"]):
+                print(str(teraviku_lõpp-1)+" tunniks, Lülitan Elektri Välja")
+                ürituse_kirjeldus=(str(round((read[1]["Hind"]-read[0]["Hind"])/read[0]["Hind"]*100, 0))
+                                   +"% Hinnatõus "+str(teraviku_lõpp)+". tunniks ("
+                                   +str(round(maksusta_hind(read[0]["Hind"]),2))+"¢/kWh -> "
+                                   +str(round(maksusta_hind(read[1]["Hind"]),2))+"¢/kWh)!")
+                if not GoogleKalender.üritus_olemas(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp):
+                    GoogleKalender.loo_üritus(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp,väärtus,ürituse_kirjeldus)
+                else:
+                    global silumine
+                    silumine = True
+                for teraviku_väli in range(1, teraviku_lõpp):
+                    read[teraviku_väli][andmetüüp]=väärtus
+                break
+
+
+
+
+
+####################################################################################################
+#    STATISTIKA TUGIFUNKTSIOONID (KASUTUSETA HETKEL)                                               #
+####################################################################################################
+def maksusta_hind(börsihind):
+    '''
+    Teisendab API Börsihinna Inimloetavasse 
+    '''
+    tarbijaHind = float(börsihind)/10		#Konverteerin €/MWh -> ¢/kWh
+    tarbijaHind = float(tarbijaHind)*1.2	#Lisan Käibemaksu
+    return tarbijaHind
+
+
+
+### VAJAB UUT LAHENDUST ###
 def statistika(elektriAndmed, seade):
-	keskmineHind={"summa":0,"kogus":len(elektriAndmed),"tulemus":0}
-	seesHind={"summa":0,"kogus":0,"tulemus":0}
-	väljasHind={"summa":0,"kogus":0,"tulemus":0}
-	for aeg in range(len(elektriAndmed)):
-		keskmineHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-		if elektriAndmed[list(elektriAndmed.keys())[aeg]][seade]:
-			seesHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-			seesHind["kogus"]+=1
-		else:
-			väljasHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-			väljasHind["kogus"]+=1
-	print("Saadaval on järgneva "+str(keskmineHind["kogus"])+" tunni elektrihinnad\n")
-	if keskmineHind["kogus"] > 0:
-		keskmineHind["tulemus"]=elektriMaksustamine(keskmineHind["summa"]/keskmineHind["kogus"])
-		print("Sellel ajal on keskmine elektrihind: "+str(round(keskmineHind["tulemus"],2))+"¢/kWh")
-	if seesHind["kogus"] > 0:
-		seesHind["tulemus"]=elektriMaksustamine(seesHind["summa"]/seesHind["kogus"])
-		print("Kasutuse ajal on keskmine elektrihind: "+str(round(seesHind["tulemus"],2))+"¢/kWh")
-	if väljasHind["kogus"] > 0:
-		väljasHind["tulemus"]=elektriMaksustamine(väljasHind["summa"]/väljasHind["kogus"])
-		print("Väljalülitamise ajal on keskmine elektrihind: "+str(round(väljasHind["tulemus"],2))+"¢/kWh")
+    keskmineHind={"summa":0,"kogus":len(elektriAndmed),"tulemus":0}
+    seesHind={"summa":0,"kogus":0,"tulemus":0}
+    väljasHind={"summa":0,"kogus":0,"tulemus":0}
+    for aeg in range(len(elektriAndmed)):
+        keskmineHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
+        if elektriAndmed[list(elektriAndmed.keys())[aeg]][seade]:
+            seesHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
+            seesHind["kogus"]+=1
+        else:
+            väljasHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
+            väljasHind["kogus"]+=1
+    print("Saadaval on järgneva "+str(keskmineHind["kogus"])+" tunni elektrihinnad\n")
+    if keskmineHind["kogus"] > 0:
+        keskmineHind["tulemus"]=maksusta_hind(keskmineHind["summa"]/keskmineHind["kogus"])
+        print("Sellel ajal on keskmine elektrihind: "+str(round(keskmineHind["tulemus"],2))+"¢/kWh")
+    if seesHind["kogus"] > 0:
+        seesHind["tulemus"]=maksusta_hind(seesHind["summa"]/seesHind["kogus"])
+        print("Kasutuse ajal on keskmine elektrihind: "+str(round(seesHind["tulemus"],2))+"¢/kWh")
+    if väljasHind["kogus"] > 0:
+        väljasHind["tulemus"]=maksusta_hind(väljasHind["summa"]/väljasHind["kogus"])
+        print("Väljalülitamise ajal on keskmine elektrihind: "
+              +str(round(väljasHind["tulemus"],2))+"¢/kWh")
+### VAJAB UUT LAHENDUST ###
 
 
 
 
 
 ####################################################################################################
-#	PÕHI KOOD																					   #
+#    VÄLISED FUNKTSIOONID                                                                          #
+####################################################################################################
+def uued_hinnad(alg_aeg:datetime, lõpp_aeg:datetime):
+    '''
+    Kontrollib ja Salvestab Uued Elektri Hinnad kui Saadaval.
+    '''
+    laetud_graafik = ElektriAndmed()
+    salvestatud_graafik = ElektriAndmed()
+    laetud_graafik.loe_võrgust(alg_aeg, lõpp_aeg)
+    print("Allalaetud Hinnad:\n"+str(laetud_graafik))
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, alg_aeg, lõpp_aeg)
+    print("Loetud Hinnad:\n"+str(salvestatud_graafik))
+    if not salvestatud_graafik.sisaldab_andmeid(laetud_graafik, "Hind"):
+        print(salvestatud_graafik.kopeeri_andmed(laetud_graafik),"Välja Uuendatud!")
+        salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, alg_aeg, lõpp_aeg)
+        print("Salvestatud Hinnad:\n"+str(salvestatud_graafik))
+        return True
+    else:
+        print("Uuemaid Andmeid Polnud Saadaval!")
+        return False
+
+
+
+def lülita_alati(seade:str, lüliti_asend:bool):
+    '''
+    Lülitab Antud Seadme Lüliti, Antud Asendisse, Terve Graafiku Ajaks.
+    '''
+    tund = datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    tund = (tund
+            -timedelta(minutes=tund.minute)
+            -timedelta(seconds=tund.second)
+            -timedelta(microseconds=tund.microsecond))
+    salvestatud_graafik = ElektriAndmed()
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+    salvestatud_graafik.rakenda_rea_kaupa(1, välja_uuendamine, [seade, lüliti_asend])
+    salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+
+
+
+def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
+    '''
+    Lülitab Antud Seadme Lüliti, Antud Asendisse, Iga Päeva Soodsaimal Ajal, Antud Kestuseks.
+    '''
+    tund = datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    tund = (tund
+            -timedelta(minutes=tund.minute)
+            -timedelta(seconds=tund.second)
+            -timedelta(microseconds=tund.microsecond))
+    salvestatud_graafik = ElektriAndmed()
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+
+	#Lülita kõik seade vastand asendisse.
+    salvestatud_graafik.rakenda_rea_kaupa(1, välja_uuendamine, [seade, not lüliti_asend])
+    #Lisa keskmised hinnad.
+    salvestatud_graafik.rakenda_rea_kaupa(kestus, välja_lisamine_keskmine)
+    keskmise_tulp = "Jooksev "+str(kestus)+". Tunni Keskmine"
+    #Lülita soodsaimatel hindadel seade asendisse.
+    soodsaimadPerioodid = salvestatud_graafik.päeva_väikseim(keskmise_tulp)
+    for päev in soodsaimadPerioodid:
+        if not salvestatud_graafik.sisaldab_andmetüüpi(päev, keskmise_tulp):
+            continue
+        ürituseKirjeldus = ("Keskmine Hind: "
+        +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))+"¢/kWh!")
+        if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
+                                  salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
+                                  seade):
+                    GoogleKalender.loo_üritus(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
+                                  salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
+                                  seade, lüliti_asend, ürituseKirjeldus)
+        else:
+            global silumine
+            silumine = True
+        salvestatud_graafik.rakenda_reale(päev, päev+kestus,
+                                          välja_uuendamine, [seade, lüliti_asend])
+    #Kustuta keskmised hinnad:
+    salvestatud_graafik.rakenda_rea_kaupa(1, välja_kustutamine, [keskmise_tulp])
+
+    salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+
+
+
+def lülita_teravikul(seade:str, lüliti_asend:bool, kestus:int):
+    '''
+    Lülitab Antud Seadme Lüliti, Antud Asendisse
+    Kui Järsk Hinna Tõus Jääb Antud Kestuvusega Samasse Suurusjärku.
+    '''
+    tund = datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    tund = (tund
+            -timedelta(minutes=tund.minute)
+            -timedelta(seconds=tund.second)
+            -timedelta(microseconds=tund.microsecond))
+    salvestatud_graafik = ElektriAndmed()
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+    salvestatud_graafik.rakenda_rea_kaupa(1, välja_uuendamine, [seade, not lüliti_asend])
+    salvestatud_graafik.rakenda_rea_kaupa(kestus+2,
+                                          välja_uuendamine_teravikul, [seade, lüliti_asend, 30])
+    salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+
+
+
+def soodne_hetk(seade:str):
+    '''
+    Vastab Kas Hinnagraafiku Kohaselt Peaks Antud Seade Sees Olema.
+    '''
+    tund = datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    tund = (tund
+            -timedelta(minutes=tund.minute)
+            -timedelta(seconds=tund.second)
+            -timedelta(microseconds=tund.microsecond))
+    salvestatud_graafik = ElektriAndmed()
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+    return salvestatud_graafik.väärtus_ajal(tund, seade)
+
+
+
+
+
+####################################################################################################
+#    PÕHI KOOD                                                                                     #
 ####################################################################################################
 if __name__ == '__main__':
-	print("\nTere Tulemast Elektrihindajasse\n")
-	print("--------------------------------------------------")
-	print("LAADIMINE")
-	print("--------------------------------------------------")
-	kõikHinnad = elektriHindVahemikus(algAeg,lõppAeg,võrguAadress)
-	lisaJooksevKeskmineHind(kõikHinnad,akudeMaht)
-	lisaJooksevKeskmineHind(kõikHinnad,2)
-	print("\n--------------------------------------------------")
-	print("HINNA ANALÜÜS")
-	print("--------------------------------------------------")
-	lülitaElekter(kõikHinnad, True, "Paul-Kontor")
-	for seade in ajutisedRadiaatorid:
-		lülitaElekter(kõikHinnad, True, seade)
-		lülitaHinnaTeravikulElekterVälja(kõikHinnad, 30, akudeMaht, seade)
-	lülitaElekter(kõikHinnad, False, ajutisedSeadmed[0])
-	lülitaSoodsaimalKeskmiselTunnilSisse(kõikHinnad,2,ajutisedSeadmed[0])
-	print("\n--------------------------------------------------")
-	print("STATISTIKA")
-	print("--------------------------------------------------")
-	statistika(kõikHinnad,ajutisedRadiaatorid[0])
-	print("\n--------------------------------------------------")
-	print("SALVESTAMINE")
-	print("--------------------------------------------------")
-	salvestaJooksevInfo(jooksevFail,kõikHinnad)
-	print("\n--------------------------------------------------")
-	print("ARHIVEERIN")
-	print("--------------------------------------------------")
-	salvestaArhiiviInfo(arhiiviKaust,kõikHinnad)
-	if silumine:
-		sys.exit(1)
+    '''
+    # TESTIMISEKS:
+    AKUDEMAHT = 1 #Kauaks elektri võib välja lülitada
+    algAeg = (datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    -timedelta(hours=AKUDEMAHT+1)) #lahutame kaks tundi, et hetke hinnamuutust näha
+    lõppAeg = algAeg+timedelta(days=2)
+    uuedHinnad(algAeg, lõppAeg)
+    lülitaAlati("Garderoob-Radiaator",False)
+    lülitaSoodsaimal("Paul-Radiaator",True,2)
+    lülitaTeravikul("Magamis-Radiaator",False,2)
+    '''
