@@ -125,14 +125,14 @@ class ElektriAndmed:
             for tulp, lahter in oma._tabel[0].items():
                 tühimik=len(str(lahter))-len(tulp)
                 if len(tulp) > len(str(lahter)):
-                    tekst+=' '
+                    tekst+='_'
                 else:
-                    tekst+=' '*int(tühimik/2+1)
+                    tekst+='_'*int(tühimik/2+1)
                 tekst+=tulp
                 if len(tulp) > len(str(lahter)):
-                    tekst+=" |"
+                    tekst+="_|"
                 else:
-                    tekst+=' '*int(-(-tühimik//2)+1)+'|'
+                    tekst+='_'*int(-(-tühimik//2)+1)+'|'
             tekst+="\n"+'-'*tabeli_laius+"\n"
             # ANDMED
             for rida in oma._tabel:
@@ -145,14 +145,14 @@ class ElektriAndmed:
                     tühimik=len(tulp)-len(väärtus)
                     # Teksti Konstruktor
                     if len(väärtus) > len(tulp):
-                        tekst+=' '
+                        tekst+='_'
                     else:
-                        tekst+=' '*int(tühimik/2+1)
+                        tekst+='_'*int(tühimik/2+1)
                     tekst+=väärtus
                     if len(väärtus) > len(tulp):
-                        tekst+=" |"
+                        tekst+="_|"
                     else:
-                        tekst+=' '*int(-(-tühimik//2)+1)+'|'
+                        tekst+='_'*int(-(-tühimik//2)+1)+'|'
                 tekst+="\n"
             tekst+='-'*tabeli_laius
             return tekst
@@ -403,8 +403,9 @@ class ElektriAndmed:
         #Paku Asukohta (Kiire):
         ajavahe = kuupäev-oma._tabel[0]["Kuupäev"]
         võimalik_järg = (ajavahe.days * 24 + ajavahe.seconds // 3600)-1
-        if oma._tabel[võimalik_järg]["Kuupäev"] == kuupäev:
-            return oma._tabel[võimalik_järg][andmetüüp]
+        if võimalik_järg < len(oma._tabel):
+            if oma._tabel[võimalik_järg]["Kuupäev"] == kuupäev:
+                return oma._tabel[võimalik_järg][andmetüüp]
         #Otsi Asukohta (Aeglane):
         for rida in oma._tabel:
             if rida["Kuupäev"] == kuupäev:

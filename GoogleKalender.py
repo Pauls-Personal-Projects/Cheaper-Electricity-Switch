@@ -84,38 +84,29 @@ def kasutus_hetk(seadme_nimi:str):
         google_kalender = _ava_google_kalender()
         kalendrite_päring = google_kalender.calendarList().list().execute()
         kalendrid = kalendrite_päring.get('items', [])
-        seade_leitud = False
+        hetke_aeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))
         for kalender in kalendrid:
-            if seadme_nimi not in kalender['summary']:
+            if seadme_nimi not in kalender["summary"]:
                 continue
-            seade_leitud = True
-            hetke_aeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))
-            ürituste_päring = google_kalender.events().list(calendarId=kalender['id'],
-            timeMin=(hetke_aeg
-                     -timedelta(hours=1)).astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()
+            kalendri_id=[{"id": kalender["id"]}]
+            hõivatud_vahemikud = google_kalender.freebusy().query(body=
+                {"timeMin": (hetke_aeg
+                     -timedelta(hours=1)).replace(tzinfo=None).isoformat()
                      + 'Z',
-            timeMax=(hetke_aeg
-                     +timedelta(hours=1)).astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()
+                "timeMax": (hetke_aeg
+                     +timedelta(hours=1)).replace(tzinfo=None).isoformat()
                      + 'Z',
-            maxResults=1, singleEvents=True, orderBy='startTime').execute()
-            üritused = ürituste_päring.get('items', [])
-            if not üritused:
-                print("Google Kalender:","Kell",hetke_aeg.strftime("%H:%M (%d.%m.%Y)"),
-                      "Üritusi Kirjas Ei Ole."+" ["+kalender['summary']+"]")
-                return True
-            for üritus in üritused:
-                alg_aeg = parser.parse(üritus['start'].get('dateTime', üritus['start'].get('date')))
-                lõpp_aeg = parser.parse(üritus['end'].get('dateTime', üritus['end'].get('date')))
-                if alg_aeg <= hetke_aeg and hetke_aeg <= lõpp_aeg and üritus['transparency'] == "opaque":
-                    print("Google Kalender:", alg_aeg.strftime("%H:%M (%d.%m.%Y)"),
-                          "-", lõpp_aeg.strftime("%H:%M (%d.%m.%Y)"),"on", üritus['summary'])
-                    return False
-            return True
-        if not seade_leitud:
-            print("Google Kalender:",seadme_nimi, "Kalendrit Ei Leitud!")
+                "timeZone": 'Europe/Tallinn',
+                "items": kalendri_id
+                }).execute()
+            if len(hõivatud_vahemikud["calendars"][kalender["id"]]["busy"]) > 0:
+                print("Google Kalender:",seadme_nimi,"Kasutuseta",
+                      hõivatud_vahemikud["calendars"][kalender["id"]]["busy"][0]["start"],
+                      "-",hõivatud_vahemikud["calendars"][kalender["id"]]["busy"][0]["end"])
+                return False
+        return True
     except HttpError as vea_teade:
         print("VIGA: Google Kalender ("+str(vea_teade)+")")
-        print(kalender['summary'],"id on",kalender['id'])
         global silumine
         silumine = True
 
