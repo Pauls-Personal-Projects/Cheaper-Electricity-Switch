@@ -42,8 +42,10 @@ from Lülitaja import silumine                           # Veateate Edastamiseks
 ####################################################################################################
 # API Õiguseid Muutes Kustuta Google-Volitus.json.
 GOOGLE_API_VOLI = ['https://www.googleapis.com/auth/calendar']
-GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json"
-GOOGLE_API = "Võtmed/Google-API.json"
+GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
+#OOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
+GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
+#GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
 
 
 
@@ -78,7 +80,8 @@ def _ava_google_kalender():
 def kasutus_hetk(seadme_nimi:str):
     '''
 	Kontrollib Google Kalendrist Kas Seadme Nimega Kalendris
-    On Hetkeks Loodud Üritusi, Mis Osutaks Mitte Kasutamisele.
+    On Hetkeks Loodud Üritusi, Kus on Kättesaadavus Määratud Hõivatuks;
+    Osutades Seadme Mitte Kasutamisele.
 	'''
     try:
         google_kalender = _ava_google_kalender()
@@ -99,11 +102,12 @@ def kasutus_hetk(seadme_nimi:str):
                 "timeZone": 'Europe/Tallinn',
                 "items": kalendri_id
                 }).execute()
-            if len(hõivatud_vahemikud["calendars"][kalender["id"]]["busy"]) > 0:
-                print("Google Kalender:",seadme_nimi,"Kasutuseta",
-                      hõivatud_vahemikud["calendars"][kalender["id"]]["busy"][0]["start"],
-                      "-",hõivatud_vahemikud["calendars"][kalender["id"]]["busy"][0]["end"])
-                return False
+            for üritus in hõivatud_vahemikud["calendars"][kalender["id"]]["busy"]:
+                if (parser.parse(üritus["start"]) <= hetke_aeg
+                    and hetke_aeg <= parser.parse(üritus["end"])):
+                    print("Google Kalender:",seadme_nimi,"Kasutuseta",
+                      üritus["start"], "-", üritus["end"])
+                    return False
         return True
     except HttpError as vea_teade:
         print("VIGA: Google Kalender ("+str(vea_teade)+")")
@@ -174,17 +178,16 @@ def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus
       'reminders': {
         'useDefault': False,
         'overrides': [
-          {'method': 'email', 'minutes': 24 * 60},
           {'method': 'popup', 'minutes': 10},
         ],
       },
     }
     if väärtus:
-        üritus['summary'] = "Lülitan "+seadme_nimi.split('-')[1]+" Sisse!"
-        üritus['colorId'] = 10
+        üritus['summary'] = seadme_nimi.split('-')[1]+" Sees!"
+        üritus['colorId'] = 10 #Roheline
     else:
-        üritus['summary']="Lülitan "+seadme_nimi.split('-')[1]+" Välja!"
-        üritus['colorId'] = 11
+        üritus['summary']=seadme_nimi.split('-')[1]+" Väljas!"
+        üritus['colorId'] = 11 #Punane
 
     try:
         google = _ava_google_kalender()

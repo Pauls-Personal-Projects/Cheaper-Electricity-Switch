@@ -468,8 +468,8 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
         for teraviku_lõpp in range(2, len(read)):
             if (read[1]["Hind"]-teraviku_kõrgus) > (read[teraviku_lõpp]["Hind"]):
                 print(str(teraviku_lõpp-1)+" tunniks, Lülitan Elektri Välja")
-                ürituse_kirjeldus=(str(round((read[1]["Hind"]-read[0]["Hind"])/read[0]["Hind"]*100, 0))
-                                   +"% Hinnatõus "+str(teraviku_lõpp)+". tunniks ("
+                ürituse_kirjeldus=("📈",str(round((read[1]["Hind"]-read[0]["Hind"])/read[0]["Hind"]*100, 0))
+                                   +"% Hinnatõus "+str(teraviku_lõpp-1)+". tunniks ("
                                    +str(round(maksusta_hind(read[0]["Hind"]),2))+"¢/kWh -> "
                                    +str(round(maksusta_hind(read[1]["Hind"]),2))+"¢/kWh)!")
                 if not GoogleKalender.üritus_olemas(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp):
@@ -590,12 +590,12 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
     for päev in soodsaimadPerioodid:
         if not salvestatud_graafik.sisaldab_andmetüüpi(päev, keskmise_tulp):
             continue
-        ürituseKirjeldus = ("Keskmine Hind: "
-        +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))+"¢/kWh!")
+        ürituseKirjeldus = ("📉 Päeva Soodsaim Elekter!",str(kestus)+". Tunni Keskmine Hind: "
+        +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))+"¢/kWh.")
         if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
                                   seade):
-                    GoogleKalender.loo_üritus(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
+            GoogleKalender.loo_üritus(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
                                   seade, lüliti_asend, ürituseKirjeldus)
         else:
