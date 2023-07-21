@@ -14,7 +14,6 @@ Uuendatud:    20/05/2023
 TODO:
 Vaata Muutuja nimed üle
 Vaata Meetodi Kirjeldused üle
-Lisa Synology Logimine
 '''
 
 
@@ -43,8 +42,8 @@ from Lülitaja import silumine				# Veateate Edastamiseks Synology DSM'ile.
 ELERINGI_LINK = "https://dashboard.elering.ee/api/nps/price?start="
 #+ 2022-09-22T09%3A40%3A00.000Z&end=2022-09-23T00%3A00%3A00.000Z"
 # Kaust Kuhu Arhiveeritakse Kõik Andmed
-ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
-#ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
+#ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
+ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
 AJATSOON = timezone('Europe/Tallinn')
 API_ERALDAJA = "%%3A"
 
@@ -468,7 +467,8 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
         for teraviku_lõpp in range(2, len(read)):
             if (read[1]["Hind"]-teraviku_kõrgus) > (read[teraviku_lõpp]["Hind"]):
                 print(str(teraviku_lõpp-1)+" tunniks, Lülitan Elektri Välja")
-                ürituse_kirjeldus=("📈",str(round((read[1]["Hind"]-read[0]["Hind"])/read[0]["Hind"]*100, 0))
+                ürituse_kirjeldus=("📈 "
+                                   +str(round((read[1]["Hind"]-read[0]["Hind"])/read[0]["Hind"]*100, 0))
                                    +"% Hinnatõus "+str(teraviku_lõpp-1)+". tunniks ("
                                    +str(round(maksusta_hind(read[0]["Hind"]),2))+"¢/kWh -> "
                                    +str(round(maksusta_hind(read[1]["Hind"]),2))+"¢/kWh)!")
@@ -590,8 +590,9 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
     for päev in soodsaimadPerioodid:
         if not salvestatud_graafik.sisaldab_andmetüüpi(päev, keskmise_tulp):
             continue
-        ürituseKirjeldus = ("📉 Päeva Soodsaim Elekter!",str(kestus)+". Tunni Keskmine Hind: "
-        +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))+"¢/kWh.")
+        ürituseKirjeldus = ("📉 Päeva Soodsaim Elekter! "
+                            +str(kestus)+". Tunni Keskmine Hind: "
+                            +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))+"¢/kWh.")
         if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
                                   seade):
