@@ -468,6 +468,7 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
             if (read[1]["Hind"]-teraviku_kõrgus) > (read[teraviku_lõpp]["Hind"]):
                 print(str(teraviku_lõpp-1)+" tunniks, Lülitan Elektri Välja")
                 #-Kirjeldus-
+                keskmine_hind=0
                 for teraviku_rida in range(1,teraviku_lõpp):
                     keskmine_hind+=read[teraviku_rida]["Hind"]
                 keskmine_hind=keskmine_hind/(teraviku_lõpp-1)
