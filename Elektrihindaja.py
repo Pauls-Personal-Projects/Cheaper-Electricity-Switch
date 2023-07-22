@@ -477,7 +477,7 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
                                    +"% kallim ("+str(round(maksusta_hind(keskmine_hind-read[0]["Hind"]),2))+"¢/kWh)"
                                    +str(teraviku_lõpp-1)+". tunniks.\n-----------------------------------")
                 for tund in range(1,teraviku_lõpp):
-                    ürituseKirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M - ")
+                    ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M - ")
                                     +str(round(maksusta_hind(read[tund]["Hind"]), 2))
                                     +"¢/kWh.")
                 #-Kirjeldus-
@@ -604,9 +604,9 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
                             +str(kestus)+". tunni keskmine hind: "
                             +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))
                             +"¢/kWh.\n-----------------------------------")
-        for tund in range(0,kestus-1):
-            ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+tund,"Kuupäev").strftime("%H:%M - ")
-                +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+tund,"Hind")), 2))
+        for soodsaim_tund in range(0,kestus-1):
+            ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M - ")
+                +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Hind")), 2))
                 +"¢/kWh.")
         #-Kirjeldus-
         if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
