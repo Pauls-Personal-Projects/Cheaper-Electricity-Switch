@@ -416,7 +416,11 @@ class ElektriAndmed:
         '''
         Annab Rea Järgi Antud Andmetüübi Väärtuse.
         '''
-        return oma._tabel[rida][andmetüüp]
+        if rida < len(oma._tabel):
+            väärtus = oma._tabel[rida][andmetüüp]
+        else:
+            väärtus = ""
+        return väärtus
 
 
 
@@ -474,12 +478,18 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
                 keskmine_hind=keskmine_hind/(teraviku_lõpp-1)
                 ürituse_kirjeldus=("📈 Järsk Hinnatõus!\n"
                                    +str(round((keskmine_hind-read[0]["Hind"])/read[0]["Hind"]*100, 0))
-                                   +"% kallim ("+str(round(maksusta_hind(keskmine_hind-read[0]["Hind"]),2))+"¢/kWh)"
+                                   +"%/"+str(round(maksusta_hind(keskmine_hind-read[0]["Hind"]),2))+"¢/kWh kallim "
                                    +str(teraviku_lõpp-1)+". tunniks.\n-----------------------------------")
+                ürituse_kirjeldus+=("\n"+read[0]["Kuupäev"].strftime("%H:%M 🟩 ")
+                                    +str(round(maksusta_hind(read[0]["Hind"]), 2))
+                                    +"¢/kWh")
                 for tund in range(1,teraviku_lõpp):
-                    ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M - ")
+                    ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M 🟥 ")
                                     +str(round(maksusta_hind(read[tund]["Hind"]), 2))
-                                    +"¢/kWh.")
+                                    +"¢/kWh")
+                ürituse_kirjeldus+=("\n"+read[teraviku_lõpp]["Kuupäev"].strftime("%H:%M 🟩 ")
+                                    +str(round(maksusta_hind(read[teraviku_lõpp]["Hind"]), 2))
+                                    +"¢/kWh")
                 #-Kirjeldus-
                 if not GoogleKalender.üritus_olemas(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp):
                     GoogleKalender.loo_üritus(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp,väärtus,ürituse_kirjeldus)
@@ -495,7 +505,7 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
 
 
 ####################################################################################################
-#    STATISTIKA TUGIFUNKTSIOONID (KASUTUSETA HETKEL)                                               #
+#    STATISTIKA TUGIFUNKTSIOONID                                                                   #
 ####################################################################################################
 def maksusta_hind(börsihind):
     '''
@@ -504,34 +514,6 @@ def maksusta_hind(börsihind):
     tarbijaHind = float(börsihind)/10		#Konverteerin €/MWh -> ¢/kWh
     tarbijaHind = float(tarbijaHind)*1.2	#Lisan Käibemaksu
     return tarbijaHind
-
-
-
-### VAJAB UUT LAHENDUST ###
-def statistika(elektriAndmed, seade):
-    keskmineHind={"summa":0,"kogus":len(elektriAndmed),"tulemus":0}
-    seesHind={"summa":0,"kogus":0,"tulemus":0}
-    väljasHind={"summa":0,"kogus":0,"tulemus":0}
-    for aeg in range(len(elektriAndmed)):
-        keskmineHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-        if elektriAndmed[list(elektriAndmed.keys())[aeg]][seade]:
-            seesHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-            seesHind["kogus"]+=1
-        else:
-            väljasHind["summa"]+=elektriAndmed[list(elektriAndmed.keys())[aeg]]["Hind"]
-            väljasHind["kogus"]+=1
-    print("Saadaval on järgneva "+str(keskmineHind["kogus"])+" tunni elektrihinnad\n")
-    if keskmineHind["kogus"] > 0:
-        keskmineHind["tulemus"]=maksusta_hind(keskmineHind["summa"]/keskmineHind["kogus"])
-        print("Sellel ajal on keskmine elektrihind: "+str(round(keskmineHind["tulemus"],2))+"¢/kWh")
-    if seesHind["kogus"] > 0:
-        seesHind["tulemus"]=maksusta_hind(seesHind["summa"]/seesHind["kogus"])
-        print("Kasutuse ajal on keskmine elektrihind: "+str(round(seesHind["tulemus"],2))+"¢/kWh")
-    if väljasHind["kogus"] > 0:
-        väljasHind["tulemus"]=maksusta_hind(väljasHind["summa"]/väljasHind["kogus"])
-        print("Väljalülitamise ajal on keskmine elektrihind: "
-              +str(round(väljasHind["tulemus"],2))+"¢/kWh")
-### VAJAB UUT LAHENDUST ###
 
 
 
@@ -600,14 +582,20 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
         if not salvestatud_graafik.sisaldab_andmetüüpi(päev, keskmise_tulp):
             continue
         #-Kirjeldus-
-        ürituseKirjeldus = ("🪙 Päeva Soodsaim Elekter!\n"
+        ürituseKirjeldus = ("💡 Päeva Soodsaim Elekter!\n"
                             +str(kestus)+". tunni keskmine hind: "
                             +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))
                             +"¢/kWh.\n-----------------------------------")
-        for soodsaim_tund in range(0,kestus-1):
-            ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M - ")
+        ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev-1,"Kuupäev").strftime("%H:%M 🟥 ")
+                +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev-1,"Hind")), 2))
+                +"¢/kWh")
+        for soodsaim_tund in range(0,kestus):
+            ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M 🟩 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Hind")), 2))
-                +"¢/kWh.")
+                +"¢/kWh")
+        ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev").strftime("%H:%M 🟥 ")
+                +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+kestus,"Hind")), 2))
+                +"¢/kWh")
         #-Kirjeldus-
         if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
