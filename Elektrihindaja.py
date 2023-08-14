@@ -471,6 +471,12 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
         for teraviku_lõpp in range(2, len(read)):
             if (read[1]["Hind"]-teraviku_kõrgus) > (read[teraviku_lõpp]["Hind"]):
                 print(str(teraviku_lõpp-1)+" tunniks, Lülitan Elektri Välja")
+                #-Nimi-
+                if väärtus:
+                    ürituse_nimi = andmetüüp.split('-')[1]+" Sees"
+                else:
+                    ürituse_nimi = andmetüüp.split('-')[1]+" Väljas"
+                #-Nimi-
                 #-Kirjeldus-
                 keskmine_hind=0
                 for teraviku_rida in range(1,teraviku_lõpp):
@@ -491,8 +497,8 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
                                     +str(round(maksusta_hind(read[teraviku_lõpp]["Hind"]), 2))
                                     +"¢/kWh")
                 #-Kirjeldus-
-                if not GoogleKalender.üritus_olemas(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp):
-                    GoogleKalender.loo_üritus(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp,väärtus,ürituse_kirjeldus)
+                if not GoogleKalender.üritus_olemas(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp,ürituse_nimi):
+                    GoogleKalender.loo_üritus(read[1]["Kuupäev"],read[teraviku_lõpp]["Kuupäev"],andmetüüp,väärtus,ürituse_kirjeldus,ürituse_nimi)
                 else:
                     global silumine
                     silumine = True
@@ -581,28 +587,34 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
     for päev in soodsaimadPerioodid:
         if not salvestatud_graafik.sisaldab_andmetüüpi(päev, keskmise_tulp):
             continue
+        #-Nimi-
+        if lüliti_asend:
+            ürituse_nimi = seade.split('-')[1]+" Sees"
+        else:
+            ürituse_nimi = seade.split('-')[1]+" Väljas"
+        #-Nimi-
         #-Kirjeldus-
-        ürituseKirjeldus = ("💡 Päeva Soodsaim Elekter!\n"
+        ürituse_kirjeldus = ("💡 Päeva Soodsaim Elekter!\n"
                             +str(kestus)+". tunni keskmine hind: "
                             +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))
                             +"¢/kWh.\n-----------------------------------")
-        ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev-1,"Kuupäev").strftime("%H:%M 🟥 ")
+        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev-1,"Kuupäev").strftime("%H:%M 🟥 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev-1,"Hind")), 2))
                 +"¢/kWh")
         for soodsaim_tund in range(0,kestus):
-            ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M 🟩 ")
+            ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M 🟩 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Hind")), 2))
                 +"¢/kWh")
-        ürituseKirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev").strftime("%H:%M 🟥 ")
+        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev").strftime("%H:%M 🟥 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+kestus,"Hind")), 2))
                 +"¢/kWh")
         #-Kirjeldus-
         if not GoogleKalender.üritus_olemas(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
-                                  seade):
+                                  seade,ürituse_nimi):
             GoogleKalender.loo_üritus(salvestatud_graafik.väärtus_real(päev,"Kuupäev"),
                                   salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev"),
-                                  seade, lüliti_asend, ürituseKirjeldus)
+                                  seade, lüliti_asend, ürituse_kirjeldus,ürituse_nimi)
         else:
             global silumine
             silumine = True

@@ -118,7 +118,7 @@ def kasutus_hetk(seadme_nimi:str):
 
 
 
-def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str):
+def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, ürituse_nimi:str):
     '''
 	Kontrollib Google Kalendrist Kas Seadme Nimega Kalendris
     On Antud Ajaks Juba Loodud Teavitus Üritus.
@@ -142,7 +142,7 @@ def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str):
                       "Üritusi Kirjas Ei Ole."+" ["+kalender['summary']+"]")
                 return False
             for üritus in üritused:
-                if "Lülitan "+seadme_nimi.split('-')[1] in üritus['summary']:
+                if üritus['summary'] == ürituse_nimi:
                     print("Google Kalender:", alg_aeg.strftime("%H:%M (%d.%m.%Y)"),
                           "-", lõpp_aeg.strftime("%H:%M (%d.%m.%Y)"),"on", üritus['summary'])
                     return True
@@ -159,11 +159,12 @@ def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str):
 
 
 
-def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus:bool, kirjeldus:str):
+def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus:bool, kirjeldus:str, nimi:str):
     '''
 	Loob Uue Kalendri Ürituse Seadme Nimega Google Kalendris.
 	'''
     üritus = {
+      'summary': nimi,
       'location': seadme_nimi.split('-')[0],
       'description': kirjeldus,
       'start': {
@@ -183,10 +184,8 @@ def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus
       },
     }
     if väärtus:
-        üritus['summary'] = seadme_nimi.split('-')[1]+" Sees!"
         üritus['colorId'] = 10 #Roheline
     else:
-        üritus['summary']=seadme_nimi.split('-')[1]+" Väljas!"
         üritus['colorId'] = 11 #Punane
 
     try:
