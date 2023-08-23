@@ -104,6 +104,7 @@ class ElektriAndmed:
         #Loob Uue ElektriAndmed Andmetüübi.
         '''
         oma._tabel = []
+        oma._rea_järg = None
 
 
 
@@ -297,33 +298,36 @@ class ElektriAndmed:
 
 
 
-    def kopeeri_andmed(oma, kopeeritavad_andmed):
+    def lisa_andmeid(oma, kopeeritavad_andmed):
         '''
         Lisab Andmed Antud ElektriAndmetest Oma ElektriAndmete Juurde.
         '''
-        oma_rea_järg = None	#Kiirendab Andmete Uuendamist
+        oma._rea_järg = None	#Kiirendab Andmete Uuendamist
         muudetud_väljade_hulk = 0	#Huvi/Silumise Pärast
+
         # Otsi Vanematest Andmetest Rida
         def _leia_rida(dubleeritav_rida:dict):
             '''
             Otsib Oma ElektriAndmetest Üles Antud Rea.
             '''
-            nonlocal oma_rea_järg
-            if oma_rea_järg is None:
-                oma_rea_järg = 0
-            for oma_rida in range(oma_rea_järg,len(oma._tabel)-1):
-                if oma._tabel[oma_rida]['Kuupäev'] == dubleeritav_rida['Kuupäev']:
+            if oma._rea_järg is None:
+                oma._rea_järg = 0
+            for olemas_rida in range(oma._rea_järg,len(oma._tabel)):
+                if dubleeritav_rida['Kuupäev'].hour == 0:
+                    print("Stop")
+                if oma._tabel[olemas_rida]['Kuupäev'] == dubleeritav_rida['Kuupäev']:
                     for tulp in list(dubleeritav_rida.keys()):
-                        if oma._tabel[oma_rida][tulp]!=dubleeritav_rida[tulp]:
-                            oma._tabel[oma_rida][tulp]=dubleeritav_rida[tulp]
+                        if oma._tabel[olemas_rida][tulp]!=dubleeritav_rida[tulp]:
+                            oma._tabel[olemas_rida][tulp]=dubleeritav_rida[tulp]
                             nonlocal muudetud_väljade_hulk
                             muudetud_väljade_hulk+=1
-                    return oma_rida
+                    return olemas_rida
             return None
+        
         # Iga Uue Andmerea Kohta
         for kopeeritav_rida in kopeeritavad_andmed._tabel:
-            oma_rea_järg = _leia_rida(kopeeritav_rida)
-            if oma_rea_järg is None:
+            oma._rea_järg = _leia_rida(kopeeritav_rida)
+            if oma._rea_järg is None:
                 oma._tabel.append(kopeeritav_rida)
                 muudetud_väljade_hulk+=len(kopeeritav_rida)
         return muudetud_väljade_hulk
@@ -539,7 +543,7 @@ def uued_hinnad(alg_aeg:datetime, lõpp_aeg:datetime):
     salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, alg_aeg, lõpp_aeg)
     print("Loetud Hinnad:\n"+str(salvestatud_graafik))
     if not salvestatud_graafik.sisaldab_andmeid(laetud_graafik, "Hind"):
-        print(salvestatud_graafik.kopeeri_andmed(laetud_graafik),"Välja Uuendatud!")
+        print(salvestatud_graafik.lisa_andmeid(laetud_graafik),"Välja Uuendatud!")
         salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, alg_aeg, lõpp_aeg)
         print("Salvestatud Hinnad:\n"+str(salvestatud_graafik))
         return True
@@ -643,6 +647,15 @@ def lülita_teravikul(seade:str, lüliti_asend:bool, kestus:int):
     salvestatud_graafik.rakenda_rea_kaupa(kestus+2,
                                           välja_uuendamine_teravikul, [seade, lüliti_asend, 30])
     salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+
+
+
+def lülita_enne_langust(seade:str, lüliti_asend:bool, kestus:int):
+    '''
+    Lülitab Antud Seadme Lüliti, Antud Asendisse
+    Antud Kestuvuseks Enne Hinnalangust.
+    '''
+    print("Work In Progress")
 
 
 
