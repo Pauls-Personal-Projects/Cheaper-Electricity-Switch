@@ -313,8 +313,6 @@ class ElektriAndmed:
             if oma._rea_järg is None:
                 oma._rea_järg = 0
             for olemas_rida in range(oma._rea_järg,len(oma._tabel)):
-                if dubleeritav_rida['Kuupäev'].hour == 0:
-                    print("Stop")
                 if oma._tabel[olemas_rida]['Kuupäev'] == dubleeritav_rida['Kuupäev']:
                     for tulp in list(dubleeritav_rida.keys()):
                         if oma._tabel[olemas_rida][tulp]!=dubleeritav_rida[tulp]:

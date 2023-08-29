@@ -24,6 +24,7 @@ Link: https://developers.google.com/calendar/api/quickstart/python
 ####################################################################################################
 from __future__ import print_function                   # Google Calendar APIga Ühendumiseks.
 import os                                               # Failide Salvestamiseks ja Lugemiseks.
+import time                                             # Sleepi Jaoks.
 from datetime import datetime, timedelta                # Ürituste Kuupäeva Formaatimiseks.
 from dateutil import tz, parser                         # Ürituste Kuupäeva Formaatimiseks.
 from google.auth.transport.requests import Request      # Google Calendar APIga Ühendumiseks.
@@ -207,3 +208,6 @@ def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus
         print(kalender['summary'],"id on",kalender['id'])
         global silumine
         silumine = True
+        time.sleep(30)
+        print("Üritan Uuesti!")
+        loo_üritus(alg_aeg, lõpp_aeg, seadme_nimi, väärtus, kirjeldus, nimi)
