@@ -1,7 +1,7 @@
 .DS_Store
-Võtmed/SmartThings.py
-Võtmed/Google-API.json
-Võtmed/Google-Volitus.json
 .gitsecret/keys/random_seed
 __pycache__
 !*.secret
+Võtmed/Google-API.json
+Võtmed/Google-Volitus.json
+Võtmed/SmartThings.py
