@@ -97,6 +97,8 @@ def _reegel_algoritmi(seadme_nimi:str, reeglitest_juhis:str):
         ElektriHindaja.lülita_soodsaimal(seadme_nimi, lüliti_asend, kestvus)
     elif "hinna_teravikudel" in puhastatud_juhis:
         ElektriHindaja.lülita_teravikul(seadme_nimi, lüliti_asend, kestvus)
+    elif "enne_langust" in puhastatud_juhis:
+        ElektriHindaja.lülita_enne_langust(seadme_nimi,lüliti_asend, kestvus)
     else:
         print("VIGA: Ei oska suunata juhist ("+reeglitest_juhis+")")
         global silumine

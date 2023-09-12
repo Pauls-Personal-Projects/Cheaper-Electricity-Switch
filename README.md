@@ -25,7 +25,7 @@ Kuna Ledvance ei paku rakenduseliidest seadmete juhtimiseks, pidin leidma teise 
 
 ## Images / Pildid
 
-![Price_Script](/Price_Script.PNG)
+![Google_Kalender](/Google_Kalender.PNG)
 
 ## Contributing / Toetamine
 Open to any tips and feedback!

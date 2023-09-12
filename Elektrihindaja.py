@@ -174,7 +174,7 @@ class ElektriAndmed:
         '''
         Lisab Ühe Kuu ElektriAndmed Antud .csv Failist.
         '''
-        with open(fail, mode ='r', encoding='utf-8')as csv_fail:
+        with open(fail, mode ='r', newline='', encoding='utf-8')as csv_fail:
             csv_tabel = list(csv.reader(csv_fail))
             #PÄIS
             try:
@@ -223,7 +223,7 @@ class ElektriAndmed:
         '''
         Kirjutab Antud Ridade ElektriAndmed Antud .csv Faili.
         '''
-        with open(fail, mode='w', encoding='utf-8') as csv_fail:
+        with open(fail, mode='w', newline='', encoding='utf-8') as csv_fail:
             csv_tabel = csv.writer(csv_fail, delimiter=',',
                                    quotechar='"', quoting=csv.QUOTE_MINIMAL)
             #PÄIS
@@ -486,16 +486,16 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
                 keskmine_hind=keskmine_hind/(teraviku_lõpp-1)
                 ürituse_kirjeldus=("📈 Järsk Hinnatõus!\n"
                                    +str(round((keskmine_hind-read[0]["Hind"])/read[0]["Hind"]*100, 0))
-                                   +"%/"+str(round(maksusta_hind(keskmine_hind-read[0]["Hind"]),2))+"¢/kWh kallim "
+                                   +"% ("+str(round(maksusta_hind(keskmine_hind-read[0]["Hind"]),2))+"¢/kWh) kallim "
                                    +str(teraviku_lõpp-1)+". tunniks.\n-----------------------------------")
-                ürituse_kirjeldus+=("\n"+read[0]["Kuupäev"].strftime("%H:%M 🟩 ")
+                ürituse_kirjeldus+=("\n"+read[0]["Kuupäev"].strftime("%H:%M ⚡ ")
                                     +str(round(maksusta_hind(read[0]["Hind"]), 2))
                                     +"¢/kWh")
                 for tund in range(1,teraviku_lõpp):
-                    ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M 🟥 ")
+                    ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M 🚫 ")
                                     +str(round(maksusta_hind(read[tund]["Hind"]), 2))
                                     +"¢/kWh")
-                ürituse_kirjeldus+=("\n"+read[teraviku_lõpp]["Kuupäev"].strftime("%H:%M 🟩 ")
+                ürituse_kirjeldus+=("\n"+read[teraviku_lõpp]["Kuupäev"].strftime("%H:%M ⚡ ")
                                     +str(round(maksusta_hind(read[teraviku_lõpp]["Hind"]), 2))
                                     +"¢/kWh")
                 #-Kirjeldus-
@@ -507,6 +507,59 @@ def välja_uuendamine_teravikul(read, andmetüüp:str, väärtus, teraviku_kõrg
                 for teraviku_väli in range(1, teraviku_lõpp):
                     read[teraviku_väli][andmetüüp]=väärtus
                 break
+
+
+
+def välja_uuendamine_enne_langust(read, andmetüüp:str, väärtus, teraviku_kõrgus:int):
+    '''
+    Otsib Hetke Enne Järsku Hinnalangustz!
+    TERAVIKUKÕRGUS on €/MWh, tähistab millal elekter välja lülitada.
+    '''
+    if (read[-1]["Hind"]+teraviku_kõrgus) < read[-2]["Hind"]:
+        print("Järsk Hinnalangus kell",
+              read[-1]["Kuupäev"].strftime("%H:%M (%d.%m.%Y) -"),
+              str(round(maksusta_hind(read[-2]["Hind"]),2))+"¢/kWh ->",
+              str(round(maksusta_hind(read[-1]["Hind"]),2))+"¢/kWh!")
+        esimene_tund=len(read)-2
+        for kõrge_hinna_rida in range(len(read)-2,1,-1):
+            if kõrge_hinna_rida == 1:
+                esimene_tund=1
+            if (read[-1]["Hind"]+teraviku_kõrgus) > (read[kõrge_hinna_rida]["Hind"]):
+                esimene_tund=kõrge_hinna_rida+1
+        print("Lülitan Elektri Välja "+str(len(read)-esimene_tund)+". eelnevaks tunniks!")
+        #-Nimi-
+        if väärtus:
+            ürituse_nimi = andmetüüp.split('-')[1]+" Sees"
+        else:
+            ürituse_nimi = andmetüüp.split('-')[1]+" Väljas"
+        #-Nimi-
+        #-Kirjeldus-
+        keskmine_hind=0
+        for kallim_rida in range(esimene_tund,len(read)-1):
+            keskmine_hind+=read[kallim_rida]["Hind"]
+        keskmine_hind=keskmine_hind/(len(read)-1-esimene_tund)
+        ürituse_kirjeldus=("📉 Järsk Hinnalangus!\n"
+                            +str(round((keskmine_hind-read[-1]["Hind"])/read[-1]["Hind"]*100, 0))
+                            +"% ("+str(round(maksusta_hind(keskmine_hind-read[-1]["Hind"]),2))
+                            +"¢/kWh) soodsam \n-----------------------------------")
+        ürituse_kirjeldus+=("\n"+read[0]["Kuupäev"].strftime("%H:%M ⚡ ")
+                            +str(round(maksusta_hind(read[0]["Hind"]), 2))
+                            +"¢/kWh")
+        for tund in range(esimene_tund,len(read)-1):
+            ürituse_kirjeldus+=("\n"+read[tund]["Kuupäev"].strftime("%H:%M 🚫 ")
+                                +str(round(maksusta_hind(read[tund]["Hind"]), 2))
+                                +"¢/kWh")
+        ürituse_kirjeldus+=("\n"+read[-1]["Kuupäev"].strftime("%H:%M ⚡ ")
+                            +str(round(maksusta_hind(read[-1]["Hind"]), 2))
+                            +"¢/kWh")
+        #-Kirjeldus-
+        if not GoogleKalender.üritus_olemas(read[esimene_tund]["Kuupäev"],read[-1]["Kuupäev"],andmetüüp,ürituse_nimi):
+            GoogleKalender.loo_üritus(read[esimene_tund]["Kuupäev"],read[-1]["Kuupäev"],andmetüüp,väärtus,ürituse_kirjeldus,ürituse_nimi)
+        else:
+            global silumine
+            silumine = True
+        for kallim_väli in range(esimene_tund, len(read)-1):
+            read[kallim_väli][andmetüüp]=väärtus
 
 
 
@@ -579,9 +632,7 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
     salvestatud_graafik = ElektriAndmed()
     salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
 
-	#Lülita kõik seade vastand asendisse.
-    salvestatud_graafik.rakenda_rea_kaupa(1, välja_uuendamine, [seade, not lüliti_asend])
-    #Lisa keskmised hinnad.
+	#Lisa keskmised hinnad.
     salvestatud_graafik.rakenda_rea_kaupa(kestus, välja_lisamine_keskmine)
     keskmise_tulp = "Jooksev "+str(kestus)+". Tunni Keskmine"
     #Lülita soodsaimatel hindadel seade asendisse.
@@ -600,14 +651,14 @@ def lülita_soodsaimal(seade:str, lüliti_asend:bool, kestus:int):
                             +str(kestus)+". tunni keskmine hind: "
                             +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev,keskmise_tulp)), 2))
                             +"¢/kWh.\n-----------------------------------")
-        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev-1,"Kuupäev").strftime("%H:%M 🟥 ")
+        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev-1,"Kuupäev").strftime("%H:%M 🚫 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev-1,"Hind")), 2))
                 +"¢/kWh")
         for soodsaim_tund in range(0,kestus):
-            ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M 🟩 ")
+            ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Kuupäev").strftime("%H:%M ⚡ ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+soodsaim_tund,"Hind")), 2))
                 +"¢/kWh")
-        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev").strftime("%H:%M 🟥 ")
+        ürituse_kirjeldus+=("\n"+salvestatud_graafik.väärtus_real(päev+kestus,"Kuupäev").strftime("%H:%M 🚫 ")
                 +str(round(maksusta_hind(salvestatud_graafik.väärtus_real(päev+kestus,"Hind")), 2))
                 +"¢/kWh")
         #-Kirjeldus-
@@ -641,7 +692,6 @@ def lülita_teravikul(seade:str, lüliti_asend:bool, kestus:int):
             -timedelta(microseconds=tund.microsecond))
     salvestatud_graafik = ElektriAndmed()
     salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
-    salvestatud_graafik.rakenda_rea_kaupa(1, välja_uuendamine, [seade, not lüliti_asend])
     salvestatud_graafik.rakenda_rea_kaupa(kestus+2,
                                           välja_uuendamine_teravikul, [seade, lüliti_asend, 30])
     salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
@@ -653,7 +703,16 @@ def lülita_enne_langust(seade:str, lüliti_asend:bool, kestus:int):
     Lülitab Antud Seadme Lüliti, Antud Asendisse
     Antud Kestuvuseks Enne Hinnalangust.
     '''
-    print("Work In Progress")
+    tund = datetime.now(tz=tz.gettz('Europe/Tallinn'))
+    tund = (tund
+            -timedelta(minutes=tund.minute)
+            -timedelta(seconds=tund.second)
+            -timedelta(microseconds=tund.microsecond))
+    salvestatud_graafik = ElektriAndmed()
+    salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
+    salvestatud_graafik.rakenda_rea_kaupa(kestus+2,
+                                          välja_uuendamine_enne_langust, [seade, lüliti_asend, 50])
+    salvestatud_graafik.hoiusta_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
 
 
 
