@@ -43,11 +43,10 @@ from Lülitaja import silumine                           # Veateate Edastamiseks
 ####################################################################################################
 # API Õiguseid Muutes Kustuta Google-Volitus.json.
 GOOGLE_API_VOLI = ['https://www.googleapis.com/auth/calendar']
-GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
-#GOOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
-GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
-#GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
-VÕRDLUS_ÜRITUSTE_HULK = 5 #Mitme Olemasoleva Kalendri Üritusega Võrrelda, Otsides Kas Üritus on Juba Olemas.
+#GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
+GOOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
+#GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
+GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
 
 
 
