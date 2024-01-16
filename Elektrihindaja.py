@@ -42,8 +42,8 @@ from Lülitaja import silumine				# Veateate Edastamiseks Synology DSM'ile.
 ELERINGI_LINK = "https://dashboard.elering.ee/api/nps/price?start="
 #+ 2022-09-22T09%3A40%3A00.000Z&end=2022-09-23T00%3A00%3A00.000Z"
 # Kaust Kuhu Arhiveeritakse Kõik Andmed
-ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
-#ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
+#ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
+ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
 AJATSOON = timezone('Europe/Tallinn')
 API_ERALDAJA = "%%3A"
 
