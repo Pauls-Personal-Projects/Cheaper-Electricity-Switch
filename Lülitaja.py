@@ -32,8 +32,8 @@ from datetime import datetime, timedelta # API Kellaaja konverteerimiseks.
 from dateutil import tz                  # API Kellaaja konverteerimiseks.
 import aiohttp                           # SmartThings APIga Ühendumiseks.
 import pysmartthings                     # SmartThings APIga Ühendumiseks.
-#sys.path.append("Võtmed") #IDE Kaust
-sys.path.append("/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed") #Pilve Kaust
+sys.path.append("Võtmed") #IDE Kaust
+#sys.path.append("/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed") #Pilve Kaust
 import SmartThings                       # SmartThings API Võti.
 import ElektriHindaja
 import GoogleKalender
@@ -45,8 +45,8 @@ import GoogleKalender
 ####################################################################################################
 #    SÄTTED                                                                                        #
 ####################################################################################################
-#REEGLITE_FAILI_ASUKOHT = "Seadmed.reeglid"  #IDE Kaust
-REEGLITE_FAILI_ASUKOHT = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Seadmed.reeglid" #Pilve Kaust
+REEGLITE_FAILI_ASUKOHT = "Seadmed.reeglid"  #IDE Kaust
+#REEGLITE_FAILI_ASUKOHT = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Seadmed.reeglid" #Pilve Kaust
 silumine = False
 
 

@@ -42,8 +42,8 @@ from Lülitaja import silumine				# Veateate Edastamiseks Synology DSM'ile.
 ELERINGI_LINK = "https://dashboard.elering.ee/api/nps/price?start="
 #+ 2022-09-22T09%3A40%3A00.000Z&end=2022-09-23T00%3A00%3A00.000Z"
 # Kaust Kuhu Arhiveeritakse Kõik Andmed
-#ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
-ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
+ANDMEKAUST = "Elektri_TuruHind" #IDE Kaust
+#ANDMEKAUST = "/volume7/Arhiiv/Teave/Elektri Turuhind" #Pilve Kaust
 AJATSOON = timezone('Europe/Tallinn')
 API_ERALDAJA = "%%3A"
 
@@ -410,7 +410,13 @@ class ElektriAndmed:
         #Otsi Asukohta (Aeglane):
         for rida in oma._tabel:
             if rida["Kuupäev"] == kuupäev:
-                return rida[andmetüüp]
+                if andmetüüp in list(rida.keys()):
+                    return rida[andmetüüp]
+                else:
+                    print("VIGA: Antud Ajal ("+kuupäev.strftime("%H:%M - %d.%m.%Y")+") "+andmetüüp+" Väärtust Ei Leitud!")
+                    global silumine
+                    silumine = True
+                    return None
 
 
 
@@ -727,7 +733,11 @@ def soodne_hetk(seade:str):
             -timedelta(microseconds=tund.microsecond))
     salvestatud_graafik = ElektriAndmed()
     salvestatud_graafik.loe_ajavahemik(ANDMEKAUST, tund, tund+timedelta(days=1))
-    return salvestatud_graafik.väärtus_ajal(tund, seade)
+    # Kui Väärtus Puudub Antud Ajal, Lülita Sisse.
+    if salvestatud_graafik.väärtus_ajal(tund, seade)==True or salvestatud_graafik.väärtus_ajal(tund, seade)==None:
+        return True
+    else:
+        return False
 
 
 

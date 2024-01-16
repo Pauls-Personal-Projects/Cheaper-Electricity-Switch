@@ -43,10 +43,11 @@ from Lülitaja import silumine                           # Veateate Edastamiseks
 ####################################################################################################
 # API Õiguseid Muutes Kustuta Google-Volitus.json.
 GOOGLE_API_VOLI = ['https://www.googleapis.com/auth/calendar']
-#GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
-GOOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
-#GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
-GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
+GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
+#GOOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
+GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
+#GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
+VÕRDLUS_ÜRITUSTE_HULK = 5 #Mitme Olemasoleva Kalendri Üritusega Võrrelda, Otsides Kas Üritus on Juba Olemas.
 
 
 
@@ -136,7 +137,7 @@ def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, üritu
             ürituste_päring = google_kalender.events().list(calendarId=kalender['id'],
             timeMin=alg_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
             timeMax=lõpp_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
-            maxResults=1, singleEvents=True, orderBy='startTime').execute()
+            maxResults=VÕRDLUS_ÜRITUSTE_HULK, singleEvents=True, orderBy='startTime').execute()
             üritused = ürituste_päring.get('items', [])
             if not üritused:
                 print("Google Kalender:","Kell",alg_aeg.strftime("%H:%M (%d.%m.%Y)"),
