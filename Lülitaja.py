@@ -9,7 +9,7 @@
 '''
 Looja:      Paul J. Aru - https://github.com/paulpall
 Kuupäev:    21/09/2022
-Uuendatud:  20/05/2023
+Uuendatud:  01/11/2024
 ------------------------------------------------------------
 Tänud    Andrew Sayre, pysmartthings teegi loomise eest
 Link: https://github.com/andrewsayre/pysmartthings
@@ -22,8 +22,12 @@ Link: https://github.com/grantlemons/light-control
 
 
 ####################################################################################################
-#    TEEGID                                                                                        #
+#    SÄTTED/TEEGID                                                                                 #
 ####################################################################################################
+#REEGLITE_FAILI_ASUKOHT = "Seadmed.reeglid"  #IDE Kaust
+REEGLITE_FAILI_ASUKOHT = r"/volume2/homes/Paul/Drive/🗂️ Dokumendid/👤 Isiklik/Projektid/Elektrihind/Seadmed.reeglid" #Pilve Kaust
+silumine = True
+
 import os.path                           # Failide Salvestamiseks ja Lugemiseks.
 import csv                               # Failide Salvestamiseks ja Lugemiseks.
 import asyncio                           # SmartThings APIga Ühendumiseks.
@@ -33,21 +37,10 @@ from dateutil import tz                  # API Kellaaja konverteerimiseks.
 import aiohttp                           # SmartThings APIga Ühendumiseks.
 import pysmartthings                     # SmartThings APIga Ühendumiseks.
 #sys.path.append("Võtmed") #IDE Kaust
-sys.path.append("/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed") #Pilve Kaust
+sys.path.append(r"/volume2/homes/Paul/Drive/🗂️ Dokumendid/👤 Isiklik/Projektid/Elektrihind/Võtmed") #Pilve Kaust
 import SmartThings                       # SmartThings API Võti.
 import ElektriHindaja
 import GoogleKalender
-
-
-
-
-
-####################################################################################################
-#    SÄTTED                                                                                        #
-####################################################################################################
-#REEGLITE_FAILI_ASUKOHT = "Seadmed.reeglid"  #IDE Kaust
-REEGLITE_FAILI_ASUKOHT = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Seadmed.reeglid" #Pilve Kaust
-silumine = False
 
 
 
@@ -93,8 +86,10 @@ def _reegel_algoritmi(seadme_nimi:str, reeglitest_juhis:str):
 
     if "alati" in puhastatud_juhis:
         ElektriHindaja.lülita_alati(seadme_nimi, lüliti_asend)
-    elif "soodsaim" in puhastatud_juhis:
-        ElektriHindaja.lülita_soodsaimal(seadme_nimi, lüliti_asend, kestvus)
+    elif "soodsaim_järjestikku" in puhastatud_juhis:
+        ElektriHindaja.lülita_soodsaimal_järjestikku(seadme_nimi, lüliti_asend, kestvus)
+    elif "soodsaim_katkendlikku" in puhastatud_juhis:
+        ElektriHindaja.lülita_soodsaimal_katkendlikku(seadme_nimi, lüliti_asend, kestvus)
     elif "hinna_teravikudel" in puhastatud_juhis:
         ElektriHindaja.lülita_teravikul(seadme_nimi, lüliti_asend, kestvus)
     elif "enne_langust" in puhastatud_juhis:
@@ -121,7 +116,8 @@ async def _pea_ülesanne():
     alg_aeg = datetime.now(tz=tz.gettz('Europe/Tallinn'))-timedelta(hours=2)
     #lahutame kaks tundi, et hetke hinnamuutust näha
     lõpp_aeg = alg_aeg+timedelta(days=2)
-    if ElektriHindaja.uued_hinnad(alg_aeg, lõpp_aeg):
+    global silumine
+    if ElektriHindaja.uued_hinnad(alg_aeg, lõpp_aeg) or silumine:
         for seade in list(seadmete_reeglid.keys()):
             print("\n"+seade+" Juhiste Uuendamine:")
             for reegel in seadmete_reeglid[seade]:
@@ -130,10 +126,22 @@ async def _pea_ülesanne():
         api = pysmartthings.SmartThings(ühendus, SmartThings.Ligipääsu_Token)
         asukohad = await api.locations()
         for asukoht in asukohad:
-            print("Leidsin "+str(len(asukohad))+". Asukoha: "+asukoht.name)
-            nutipistikud = await api.devices()
+            print("\nLeidsin "+str(len(asukohad))+". asukoha: "+asukoht.name)
+            try:
+                nutipistikud = await api.devices()
+            except aiohttp.client_exceptions.ClientResponseError as viga:
+                silumine = True
+                if viga.status == 401:
+                    print(f"SmartThings kaotas ühenduse? : {viga.message}")
+                    # Handle re-authentication or notify the user
+                else:
+                    print(f"SmartThingsi viga: {viga.message}")
             for nutipistik in nutipistikud:
-                await nutipistik.status.refresh()
+                try:
+                    await nutipistik.status.refresh()
+                except pysmartthings.errors.APIResponseError as viga:
+                    silumine = True
+                    print(f"Viga {nutipistik.label} seadme oleku värskendamisel: {viga}")
                 if (ElektriHindaja.soodne_hetk(nutipistik.label) and
                     GoogleKalender.kasutus_hetk(nutipistik.label)):
                     print("Lülitan", nutipistik.label,"Sisse!")

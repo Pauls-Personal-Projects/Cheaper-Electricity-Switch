@@ -9,20 +9,29 @@
 '''
 Looja:      Paul J. Aru - https://github.com/paulpall
 Kuupäev:    09/05/2023
-Uuendatud:  20/05/2023
+Uuendatud:  01/11/2024
 ------------------------------------------------------------
 Tänud    Google, quickstart näite loomise eest
 Link: https://developers.google.com/calendar/api/quickstart/python
 '''
+# VAATA GOOGLE KALENDRI REQUEST ÜLE, TEE ÜHTNE FUNKTSIOON
 
 
 
 
 
 ####################################################################################################
-#    TEEGID                                                                                        #
+#    SÄTTED/TEEGID                                                                                 #
 ####################################################################################################
-from __future__ import print_function                   # Google Calendar APIga Ühendumiseks.
+# API Õiguseid Muutes Kustuta Google-Volitus.json.
+GOOGLE_API_VOLI = ['https://www.googleapis.com/auth/calendar']
+#GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
+GOOGLE_VOLITUS = r"/volume2/homes/Paul/Drive/🗂️ Dokumendid/👤 Isiklik/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
+#GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
+GOOGLE_API = r"/volume2/homes/Paul/Drive/🗂️ Dokumendid/👤 Isiklik/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
+VÕRDLUS_ÜRITUSTE_HULK = 5 #Mitme Olemasoleva Kalendri Üritusega Võrrelda, Otsides Kas Üritus on Juba Olemas.
+KORDUSKATSE_LIMIIT = 5 #Kui Kaua Google Serveritele Pinda Käia
+
 import os                                               # Failide Salvestamiseks ja Lugemiseks.
 import time                                             # Sleepi Jaoks.
 from datetime import datetime, timedelta                # Ürituste Kuupäeva Formaatimiseks.
@@ -33,20 +42,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow  # Google Calendar APIga 
 from googleapiclient.discovery import build             # Google Calendar APIga Ühendumiseks.
 from googleapiclient.errors import HttpError            # Google Calendar APIga Ühendumiseks.
 from Lülitaja import silumine                           # Veateate Edastamiseks Synology DSM'ile.
-
-
-
-
-
-####################################################################################################
-#    SÄTTED                                                                                        #
-####################################################################################################
-# API Õiguseid Muutes Kustuta Google-Volitus.json.
-GOOGLE_API_VOLI = ['https://www.googleapis.com/auth/calendar']
-#GOOGLE_VOLITUS = "Võtmed/Google-Volitus.json" #IDE Kaust
-GOOGLE_VOLITUS = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-Volitus.json" #Pilve Kaust
-#GOOGLE_API = "Võtmed/Google-API.json" #IDE Kaust
-GOOGLE_API = "/volume1/homes/Paul/Drive/Projektid/Elektrihind/Võtmed/Google-API.json" #Pilve Kaust
 
 
 
@@ -112,7 +107,6 @@ def kasutus_hetk(seadme_nimi:str):
         return True
     except HttpError as vea_teade:
         print("VIGA: Google Kalender ("+str(vea_teade)+")")
-        global silumine
         silumine = True
 
 
@@ -126,26 +120,42 @@ def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, üritu
 	'''
     try:
         google_kalender = _ava_google_kalender()
-        kalendrite_päring = google_kalender.calendarList().list().execute()
+        kalendrite_päring = None
+        for katse in range(KORDUSKATSE_LIMIIT):
+            try:
+                kalendrite_päring = google_kalender.calendarList().list().execute()
+                break
+            except HttpError as vea_teade:
+                if vea_teade.resp.status == 503:
+                    print(f"Google Server jäi Magama: {vea_teade}")
+                    time.sleep((2 ** attempt) + (random.randint(0, 1000) / 1000))
+                else:
+                    raise
+        if kalendrite_päring is None:
+            raise Exception("Google Server ei vasta!")
         kalendrid = kalendrite_päring.get('items', [])
         seade_leitud = False
         for kalender in kalendrid:
             if seadme_nimi not in kalender['summary']:
                 continue
             seade_leitud = True
-            ürituste_päring = google_kalender.events().list(calendarId=kalender['id'],
-            timeMin=alg_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
-            timeMax=lõpp_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
-            maxResults=VÕRDLUS_ÜRITUSTE_HULK, singleEvents=True, orderBy='startTime').execute()
+            try:
+                ürituste_päring = google_kalender.events().list(calendarId=kalender['id'],
+                timeMin=alg_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
+                timeMax=lõpp_aeg.astimezone(tz.tzutc()).replace(tzinfo=None).isoformat()+ 'Z',
+                maxResults=VÕRDLUS_ÜRITUSTE_HULK, singleEvents=True, orderBy='startTime').execute()
+            except TimeoutError as vea_teade:
+                print("Google Server jäi Magama:", vea_teade)
+                silumine = True
             üritused = ürituste_päring.get('items', [])
             if not üritused:
                 print("Google Kalender:","Kell",alg_aeg.strftime("%H:%M (%d.%m.%Y)"),
                       "Üritusi Kirjas Ei Ole."+" ["+kalender['summary']+"]")
                 return False
             for üritus in üritused:
-                if üritus['summary'] == ürituse_nimi:
-                    print("Google Kalender:", alg_aeg.strftime("%H:%M (%d.%m.%Y)"),
-                          "-", lõpp_aeg.strftime("%H:%M (%d.%m.%Y)"),"on", üritus['summary'])
+                if üritus['summary']==ürituse_nimi and datetime.strptime(üritus['start']['dateTime'], "%Y-%m-%dT%H:%M:%S%z")==alg_aeg and datetime.strptime(üritus['end']['dateTime'], "%Y-%m-%dT%H:%M:%S%z")==lõpp_aeg:
+                    print("Google Kalender:", datetime.strptime(üritus['start']['dateTime'], "%Y-%m-%dT%H:%M:%S%z").strftime("%H:%M (%d.%m.%Y)"),
+                          "-", datetime.strptime(üritus['end']['dateTime'], "%Y-%m-%dT%H:%M:%S%z").strftime("%H:%M (%d.%m.%Y)"),"on", üritus['summary'])
                     return True
             return False
         if not seade_leitud:
@@ -153,7 +163,6 @@ def üritus_olemas(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, üritu
     except HttpError as vea_teade:
         print("VIGA: Google Kalender ("+str(vea_teade)+")")
         print(kalender['summary'],"id on",kalender['id'])
-        global silumine
         silumine = True
 
 
@@ -206,7 +215,6 @@ def loo_üritus(alg_aeg:datetime, lõpp_aeg:datetime, seadme_nimi:str, väärtus
     except HttpError as vea_teade:
         print("VIGA: Google Kalender ("+str(vea_teade)+")")
         print(kalender['summary'],"id on",kalender['id'])
-        global silumine
         silumine = True
         time.sleep(30)
         print("Üritan Uuesti!")
